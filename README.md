@@ -1,102 +1,177 @@
 # Adwya-Backend
 
-> Server-Side Code of Adwya app that enables purchasing medicine online from any available nearby pharmacy. App idea is to allow customers to search, request, and pay for medicines through the app selecting form a specific pharmacy based on their choice or based on closest geographically one. from pharmacy perspective it will have a dashboard to register itself (with all needed legal docs and data) and upload all its data to our site, then users will be able to search for any medicine, view and add to cart the needed ones, then go to checkout and initially we will have three options only: cash, visa on delivery, InstaPay, then in future will add in-app purchase or debit/credit card payment gateway. Also we will need in the future a customer service in-app chat to contact support. it will definitely need notification, admin dashboard for us or admins (different from Pharmacy dashboard).
+NestJS 11 + Prisma 6 + PostgreSQL service for **Adwya** — an Egypt-targeted pharmacy-delivery marketplace. Customers browse medicines, pick a pharmacy, add to cart, and check out. Pharmacies self-onboard via a dashboard and manage their own catalog. Admins run a separate dashboard.
 
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+See [`domain-notes.md`](./domain-notes.md) for the business rules and workflows the schema can't express (checkout transaction, prescription gating, payment idempotency, etc.).
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## Stack
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+- **NestJS 11** (`@nestjs/common`, `@nestjs/core`, `@nestjs/platform-express`)
+- **Prisma 6** + PostgreSQL 15+
+- **TypeScript 5.7** (ES2023, NodeNext, `strictNullChecks` on)
+- **class-validator** + **class-transformer** for DTO validation
+- **Jest 30** for unit and e2e tests
+- **ESLint 9** (flat config, type-checked) + **Prettier 3**
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Common commands
 
 ```bash
-$ npm install
+# install
+npm install
+
+# generate Prisma client (run after any schema.prisma change)
+npm run prisma:generate
+
+# dev (watch mode)
+npm run start:dev
+
+# production build + run
+npm run build && npm run start:prod
+
+# lint (auto-fix) and format
+npm run lint
+npm run format
+
+# tests
+npm run test          # unit tests (src/**/*.spec.ts)
+npm run test:e2e      # e2e tests (test/**/*.e2e-spec.ts)
+npm run test:cov      # unit tests + coverage to ../coverage
 ```
 
-## Compile and run the project
+## Project layout
+
+```
+src/
+  main.ts                # bootstrap, global ValidationPipe, /healthz
+  app.module.ts          # root @Module — wires ConfigModule + PrismaModule + feature modules
+  config/
+    app.config.ts        # AppConfig class + validateEnv (env-var schema, validated at boot)
+  prisma/
+    prisma.module.ts     # @Global() module exporting PrismaService
+    prisma.service.ts    # extends PrismaClient, OnModuleInit/OnModuleDestroy for connect/disconnect
+  common/
+    enums/               # re-exports Prisma enums so DTOs import from one place
+    validators/          # custom class-validator decorators (IsEgyptianPhone, etc.)
+  <feature>/
+    dto/                 # create- / update- / filter- / response- DTOs
+    <feature>.module.ts
+    <feature>.controller.ts
+    <feature>.service.ts
+test/
+  *.e2e-spec.ts          # e2e tests
+schema.prisma            # Prisma schema (source of truth for the data model)
+schema.prisma.original   # pre-PostGIS-removal snapshot, kept for reference
+domain-notes.md          # business rules & workflows (companion to schema.prisma)
+```
+
+## Environment variables
+
+All env vars are validated at boot by `src/config/app.config.ts`. Boot fails fast on a missing required value or a malformed value.
+
+| Var | Required | Default | Notes |
+|---|---|---|---|
+| `NODE_ENV` | no | `development` | One of `development`/`test`/`production` |
+| `PORT` | no | `3000` | HTTP listen port |
+| `DATABASE_URL` | **yes** | — | Prisma Postgres connection string, e.g. `postgresql://user:pass@localhost:5432/adwya?schema=public` |
+| `JWT_SECRET` | no (required once auth lands) | — | Symmetric secret for `@nestjs/jwt` |
+| `JWT_EXPIRES_IN` | no | `7d` | Token lifetime, passed to `JwtModule.signOptions` |
+| `APP_PUBLIC_URL` | no | — | Public base URL used for absolute deep links (e.g. WhatsApp messages) |
+
+`.env*` is gitignored. Place a `.env` at the repo root for local dev.
+
+## Database setup
+
+### 1. Local Postgres requirements
+
+- Postgres 15+ (any 13+ works, but 15 is what we test against)
+- The `pg_trgm` extension must be available (used for fuzzy medicine search; added in the migration below)
+- A database you can connect to with the `DATABASE_URL` role
 
 ```bash
-# development
-$ npm run start
+# install (Ubuntu/Debian)
+sudo apt install postgresql postgresql-contrib
+# the postgresql-contrib package ships pg_trgm
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+# macOS (Homebrew)
+brew install postgresql@15
+brew services start postgresql@15
 ```
-
-## Run tests
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# create the role + database (one-time)
+sudo -u postgres psql <<'SQL'
+CREATE USER adwya WITH PASSWORD 'adwya_dev';
+CREATE DATABASE adwya OWNER adwya;
+\c adwya
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+SQL
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 2. Schema migration
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# generates a migration from schema.prisma, applies it, regenerates the client
+npm run prisma:migrate
+
+# production deploy (no prompts, applies existing migrations only)
+npm run prisma:migrate:deploy
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+`prisma migrate dev` writes SQL files under `prisma/migrations/`. Each migration is replayed in order on `migrate deploy`.
 
-## Resources
+### 3. Raw SQL applied alongside Prisma
 
-Check out a few resources that may come in handy when working with NestJS:
+A few constraints and indexes can't be expressed in `schema.prisma` (Prisma has no native CHECK-constraint support and we don't enable the `postgresqlExtensions` preview feature). After the first `prisma migrate dev` runs, add a single follow-up migration that contains:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+- A `pg_trgm` GIN index on `medicines.name` and `medicines.generic_name` (for fuzzy search — see `domain-notes.md`)
+- A `CHECK (rating BETWEEN 1 AND 5)` constraint on `reviews.rating`
+- A `CHECK` on `batches` enforcing that exactly one of `warehouse_id` / `branch_id` is set, matching `location_type`
 
-## Support
+You can author it by hand:
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```bash
+mkdir -p prisma/migrations/<timestamp>_add_raw_sql_constraints
+# write migration.sql in that directory
+```
 
-## Stay in touch
+…or run `npx prisma migrate dev --create-only --name add_raw_sql_constraints` to scaffold a Prisma migration file, then hand-edit the SQL inside it.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### 4. Seeding payment methods
+
+The MVP payment methods (`CASH`, `VISA_ON_DELIVERY`, `INSTAPAY`) are seeded rows in `payment_methods`. After migrations, insert them once:
+
+```sql
+INSERT INTO payment_methods (code, name, is_active, sort_order) VALUES
+  ('CASH',            'Cash on delivery',     true, 1),
+  ('VISA_ON_DELIVERY','Visa on delivery',     true, 2),
+  ('INSTAPAY',        'InstaPay',             true, 3),
+  ('PAYMOB_CARD',     'Paymob (card/wallet)', false, 4);
+```
+
+`PAYMOB_CARD` is inserted with `is_active = false` so it can be flipped on without a code deploy when that phase ships.
+
+(Seed script via `prisma db seed` is on the roadmap — see the open items in `domain-notes.md`.)
+
+## Architecture notes
+
+- **Modular monolith.** Each feature is a Nest module under `src/<feature>/` and is wired in `app.module.ts`. The whole thing runs in one process for now; nothing here would block splitting into microservices if/when the order/checkout load demands it.
+- **Global `ValidationPipe`.** Registered in `main.ts` with `whitelist: true, forbidNonWhitelisted: true, transform: true`. DTOs use `class-validator` decorators — request bodies are validated before reaching the service.
+- **Global `PrismaService`.** Provided by `@Global() PrismaModule`, so feature modules don't need to import it explicitly. The service connects on `onModuleInit` and disconnects on `onModuleDestroy`.
+- **DTOs vs. entities.** DTOs are the wire shape; the Prisma model is the persistence shape. They don't have to be 1:1. Decimal columns, for example, are `string` in response DTOs (preserve precision over JSON) and `number` in input DTOs (validated with `maxDecimalPlaces: 2`).
+- **Transactions.** Anything that mutates more than one row (checkout, prescription rejection → stock restore, refund) must be a Prisma `$transaction`. See `domain-notes.md` for the explicit checkout flow.
+
+## Conventions
+
+- One DTO per write operation: `create-<entity>.dto.ts`, `update-<entity>.dto.ts` (via `PartialType` / `OmitType` from `@nestjs/mapped-types`). Filter DTOs as `<entity>.filter-dto.ts`. Response DTOs as `<entity>.response-dto.ts`.
+- Prisma enums are re-exported from `src/common/enums/index.ts`; DTOs import from there, not `@prisma/client`.
+- The Egyptian-phone regex is encapsulated in `IsEgyptianPhone()` from `src/common/validators/phone.validator.ts`. Use it on every phone-shaped field — accept `01XXXXXXXXX` or `+201XXXXXXXXX` (the `01[0125]\d{8}` prefix: Vodafone/Etisalat/Orange/WE).
+- Lint config: `eslint.config.mjs` (flat, type-checked). `eslint-plugin-prettier/recommended` makes Prettier violations lint errors. `no-explicit-any` is off; `no-floating-promises` and `no-unsafe-argument` are warn-only.
+- Prettier: single quotes, trailing commas (`all`).
+
+## Health check
+
+`GET /healthz` → `{ "status": "ok" }`. Useful as a container readiness probe; it doesn't touch the database, so it returns 200 even before migrations run.
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED (private).

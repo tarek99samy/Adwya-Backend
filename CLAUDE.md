@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The current source tree is still the NestJS scaffold — domain modules for users, pharmacies, medicines, cart, orders, payments, etc. do not exist yet. New work should introduce them as Nest modules under `src/`.
 
+Always optimize tokens usage and try to do only requested tasks only
+
 ## Tech stack
 
 - NestJS 11 (`@nestjs/common`, `@nestjs/core`, `@nestjs/platform-express`).

@@ -1,0 +1,961 @@
+// ============================================================================
+// Adwya — Pharmacy Delivery Marketplace
+// Full domain schema derived from adwya-erd.png, with two required additions
+// (Prescription, BranchInventory) and license/status moved to branch level.
+// See domain-notes.md for business rules, enums, and workflow explanations.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis, pg_trgm]
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserType {
+  CUSTOMER
+  PHARMACY_STAFF
+  ADMIN
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+enum NotificationChannel {
+  PUSH
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+enum BranchStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum PharmacyStaffRole {
+  OWNER
+  MANAGER
+  PHARMACIST // required for prescription review
+  STAFF
+  COURIER
+}
+
+enum BatchLocationType {
+  WAREHOUSE
+  BRANCH
+}
+
+enum StockMovementType {
+  WAREHOUSE_RECEIPT
+  TRANSFER_TO_BRANCH
+  SALE
+  RETURN
+  DAMAGE
+  EXPIRY
+  ADJUSTMENT
+}
+
+enum PrescriptionStatus {
+  NOT_REQUIRED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum OrderStatus {
+  PENDING_CONFIRMATION
+  CONFIRMED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+// ============================================================================
+// PERMISSIONS / RBAC (as drawn: profile-based with per-user overrides)
+// ============================================================================
+
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique // e.g. "orders.view", "medicines.edit"
+  description String?
+
+  profilePermissions ProfilePermission[]
+  userPermissions    UserPermission[]
+
+  @@map("permissions")
+}
+
+model Profile {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g. "ADMIN", "SUPPORT", "PHARMACY_MANAGER"
+  description String?
+
+  permissions ProfilePermission[]
+  users       UserProfile[]
+
+  @@map("profiles")
+}
+
+model ProfilePermission {
+  profileId    String @map("profile_id")
+  permissionId String @map("permission_id")
+
+  profile    Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, permissionId])
+  @@map("profile_permissions")
+}
+
+model UserProfile {
+  userId    String @map("user_id")
+  profileId String @map("profile_id")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@id([userId, profileId])
+  @@map("user_profiles")
+}
+
+// Direct grant/deny override for a specific user, on top of their profile(s).
+model UserPermission {
+  userId       String  @map("user_id")
+  permissionId String  @map("permission_id")
+  granted      Boolean @default(true) // false = explicit deny override
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@map("user_permissions")
+}
+
+// ============================================================================
+// USERS
+// ============================================================================
+
+model User {
+  id           String   @id @default(uuid())
+  phone        String   @unique
+  email        String?  @unique
+  passwordHash String?  @map("password_hash")
+  fullName     String   @map("full_name")
+  userType     UserType @default(CUSTOMER) @map("user_type")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  profiles        UserProfile[]
+  permissions     UserPermission[]
+  addresses       Address[]
+  deviceTokens    DeviceToken[]
+  favorites       Favorite[]
+  reviews         Review[]
+  notifications   Notification[]
+  cart            Cart?
+  orders          Order[]             @relation("CustomerOrders")
+  pharmacyStaff   PharmacyStaff?
+  reviewedRx      Prescription[]      @relation("ReviewedByUser")
+  orderStatusLogs OrderStatusHistory[]
+  stockMovements  StockMovement[]
+  couponUsages    CouponUsage[]
+  processedRefunds Refund[]
+  auditLogs       AuditLog[]
+
+  @@index([userType])
+  @@map("users")
+}
+
+model Address {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  label       String
+  building    String?
+  street      String
+  area        String
+  city        String
+  governorate String
+  location    Unsupported("geography(Point, 4326)")
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+model DeviceToken {
+  id        String         @id @default(uuid())
+  userId    String         @map("user_id")
+  token     String         @unique
+  platform  DevicePlatform
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs NotificationLog[]
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+model Favorite {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  medicineId String   @map("medicine_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, medicineId])
+  @@map("favorites")
+}
+
+// ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+model NotificationTemplate {
+  id            String              @id @default(uuid())
+  code          String              @unique // e.g. "ORDER_CONFIRMED"
+  channel       NotificationChannel
+  titleTemplate String              @map("title_template")
+  bodyTemplate  String              @map("body_template")
+
+  notifications Notification[]
+
+  @@map("notification_templates")
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  templateId String?  @map("template_id")
+  title      String
+  body       String
+  type       String // e.g. "ORDER_UPDATE", "PROMO"
+  isRead     Boolean  @default(false) @map("is_read")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template NotificationTemplate?  @relation(fields: [templateId], references: [id])
+  logs     NotificationLog[]
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// Per-device delivery attempt/result for a notification (fan-out target).
+model NotificationLog {
+  id             String             @id @default(uuid())
+  notificationId String             @map("notification_id")
+  deviceTokenId  String?            @map("device_token_id")
+  status         NotificationStatus @default(QUEUED)
+  sentAt         DateTime?          @map("sent_at")
+  deliveredAt    DateTime?          @map("delivered_at")
+  failureReason  String?            @map("failure_reason")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  deviceToken  DeviceToken?  @relation(fields: [deviceTokenId], references: [id])
+
+  @@index([notificationId])
+  @@map("notification_logs")
+}
+
+// ============================================================================
+// CART
+// ============================================================================
+
+model Cart {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  branchId  String?  @map("branch_id") // cart scoped to a single branch at a time
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id         String @id @default(uuid())
+  cartId     String @map("cart_id")
+  medicineId String @map("medicine_id")
+  quantity   Int    @default(1)
+
+  cart     Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, medicineId])
+  @@map("cart_items")
+}
+
+// ============================================================================
+// PHARMACY CHAIN / BRANCH / STAFF / WAREHOUSE
+// ============================================================================
+
+model Pharmacy {
+  id        String    @id @default(uuid())
+  name      String
+  nameAr    String?   @map("name_ar")
+  taxNumber String?   @map("tax_number")
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  branches    PharmacyBranch[]
+  warehouses  PharmacyWarehouse[]
+
+  @@map("pharmacies")
+}
+
+model PharmacyBranch {
+  id                   String       @id @default(uuid())
+  pharmacyId           String       @map("pharmacy_id")
+  name                 String
+  licenseNumber        String       @unique @map("license_number") // per-location, per EG regulation
+  status               BranchStatus @default(PENDING_APPROVAL)
+  phone                String
+  whatsappNumber       String?      @map("whatsapp_number")
+  addressText          String       @map("address_text")
+  location             Unsupported("geography(Point, 4326)")
+  deliveryRadiusMeters Int          @default(5000) @map("delivery_radius_meters")
+  openingHours         Json?        @map("opening_hours")
+  ratingAvg            Decimal      @default(0) @db.Decimal(2, 1) @map("rating_avg")
+  ratingCount          Int          @default(0) @map("rating_count")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+  deletedAt            DateTime?    @map("deleted_at")
+
+  pharmacy       Pharmacy         @relation(fields: [pharmacyId], references: [id])
+  staff          PharmacyStaff[]
+  deliveryZones  DeliveryZone[]
+  inventory      BranchInventory[]
+  batches        Batch[]
+  priceHistory   PriceHistory[]
+  orders         Order[]
+  reviews        Review[]
+
+  @@index([pharmacyId])
+  @@index([status])
+  @@map("pharmacy_branches")
+}
+
+model PharmacyStaff {
+  id        String            @id @default(uuid())
+  userId    String            @unique @map("user_id")
+  branchId  String            @map("branch_id")
+  role      PharmacyStaffRole @default(STAFF)
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch         PharmacyBranch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  deliveryRuns   DeliveryRun[]
+
+  @@index([branchId])
+  @@index([role])
+  @@map("pharmacy_staff")
+}
+
+model DeliveryZone {
+  id           String  @id @default(uuid())
+  branchId     String  @map("branch_id")
+  name         String
+  areaGeom     Unsupported("geography(Polygon, 4326)")?
+  deliveryFee  Decimal @default(0) @db.Decimal(10, 2) @map("delivery_fee")
+
+  branch PharmacyBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([branchId])
+  @@map("delivery_zones")
+}
+
+model PharmacyWarehouse {
+  id          String   @id @default(uuid())
+  pharmacyId  String   @map("pharmacy_id")
+  name        String
+  addressText String   @map("address_text")
+  location    Unsupported("geography(Point, 4326)")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+  batches  Batch[]
+
+  @@index([pharmacyId])
+  @@map("pharmacy_warehouses")
+}
+
+// ============================================================================
+// CATALOG (canonical)
+// ============================================================================
+
+model Brand {
+  id      String     @id @default(uuid())
+  name    String     @unique
+  logoUrl String?    @map("logo_url")
+
+  medicines Medicine[]
+
+  @@map("brands")
+}
+
+model MedicineType {
+  id   String @id @default(uuid())
+  name String @unique // tablet, syrup, injection...
+
+  medicines Medicine[]
+
+  @@map("medicine_types")
+}
+
+model Manufacturer {
+  id      String  @id @default(uuid())
+  name    String  @unique
+  country String?
+
+  medicines Medicine[]
+
+  @@map("manufacturers")
+}
+
+model DosageUnit {
+  id   String @id @default(uuid())
+  name String @unique // mg, ml, IU...
+
+  medicines Medicine[]
+
+  @@map("dosage_units")
+}
+
+model Category {
+  id       String     @id @default(uuid())
+  name     String
+  nameAr   String?    @map("name_ar")
+  parentId String?    @map("parent_id")
+
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  medicines Medicine[]
+
+  @@map("categories")
+}
+
+model ActiveIngredient {
+  id   String @id @default(uuid())
+  name String @unique
+
+  medicines MedicineActiveIngredient[]
+
+  @@map("active_ingredients")
+}
+
+model Medicine {
+  id                   String   @id @default(uuid())
+  name                 String
+  nameAr               String?  @map("name_ar")
+  genericName          String?  @map("generic_name")
+  brandId              String?  @map("brand_id")
+  manufacturerId       String?  @map("manufacturer_id")
+  medicineTypeId       String?  @map("medicine_type_id")
+  categoryId           String?  @map("category_id")
+  dosageUnitId         String?  @map("dosage_unit_id")
+  strength             String?
+  barcode              String?  @unique
+  requiresPrescription Boolean  @default(false) @map("requires_prescription")
+  isControlled         Boolean  @default(false) @map("is_controlled")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
+
+  brand            Brand?                     @relation(fields: [brandId], references: [id])
+  manufacturer     Manufacturer?              @relation(fields: [manufacturerId], references: [id])
+  medicineType     MedicineType?              @relation(fields: [medicineTypeId], references: [id])
+  category         Category?                  @relation(fields: [categoryId], references: [id])
+  dosageUnit       DosageUnit?                @relation(fields: [dosageUnitId], references: [id])
+  activeIngredients MedicineActiveIngredient[]
+  images           MedicineImage[]
+  batches          Batch[]
+  branchInventory  BranchInventory[]
+  priceHistory     PriceHistory[]
+  orderItems       OrderItem[]
+  cartItems        CartItem[]
+  favorites        Favorite[]
+  promotionItems   PromotionProduct[]
+  stockMovements   StockMovement[]
+
+  @@index([categoryId])
+  @@map("medicines")
+}
+
+// Many-to-many: a medicine can have several active ingredients (combo drugs)
+model MedicineActiveIngredient {
+  medicineId         String  @map("medicine_id")
+  activeIngredientId String  @map("active_ingredient_id")
+  strength           String?
+
+  medicine         Medicine         @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  activeIngredient ActiveIngredient @relation(fields: [activeIngredientId], references: [id], onDelete: Cascade)
+
+  @@id([medicineId, activeIngredientId])
+  @@map("medicine_active_ingredients")
+}
+
+model MedicineImage {
+  id         String @id @default(uuid())
+  medicineId String @map("medicine_id")
+  url        String
+  sortOrder  Int    @default(0) @map("sort_order")
+
+  medicine Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+
+  @@index([medicineId])
+  @@map("medicine_images")
+}
+
+// ============================================================================
+// INVENTORY: lot tracking (Batch) + fast sellable-stock lookup (BranchInventory)
+// ============================================================================
+
+model Batch {
+  id            String            @id @default(uuid())
+  medicineId    String            @map("medicine_id")
+  locationType  BatchLocationType @map("location_type")
+  warehouseId   String?           @map("warehouse_id") // set when locationType = WAREHOUSE
+  branchId      String?           @map("branch_id")    // set when locationType = BRANCH
+  batchNumber   String            @map("batch_number")
+  expiryDate    DateTime          @map("expiry_date")
+  quantity      Int
+  costPrice     Decimal           @db.Decimal(10, 2) @map("cost_price")
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  medicine  Medicine            @relation(fields: [medicineId], references: [id])
+  warehouse PharmacyWarehouse?  @relation(fields: [warehouseId], references: [id])
+  branch    PharmacyBranch?     @relation(fields: [branchId], references: [id])
+  movements StockMovement[]
+
+  @@index([medicineId, expiryDate]) // FEFO lookups
+  @@index([warehouseId])
+  @@index([branchId])
+  @@map("batches")
+  // NOTE: add CHECK constraint in raw SQL migration:
+  // exactly one of warehouse_id / branch_id must be non-null, matching location_type
+}
+
+// Fast, checkout-facing "what can this branch sell right now" table.
+// This is what OrdersService reads/decrements — Batch is the traceability layer.
+model BranchInventory {
+  id                String   @id @default(uuid())
+  branchId          String   @map("branch_id")
+  medicineId        String   @map("medicine_id")
+  price             Decimal  @db.Decimal(10, 2)
+  quantityAvailable Int      @default(0) @map("quantity_available")
+  isAvailable       Boolean  @default(true) @map("is_available")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  branch   PharmacyBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  medicine Medicine       @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, medicineId])
+  @@index([medicineId])
+  @@map("branch_inventory")
+}
+
+model PriceHistory {
+  id            String   @id @default(uuid())
+  branchId      String   @map("branch_id")
+  medicineId    String   @map("medicine_id")
+  price         Decimal  @db.Decimal(10, 2)
+  effectiveFrom DateTime @default(now()) @map("effective_from")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  branch   PharmacyBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  medicine Medicine       @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+
+  @@index([branchId, medicineId])
+  @@map("price_history")
+}
+
+// Generic ledger explaining every quantity change to a batch / branch inventory.
+model StockMovement {
+  id            String            @id @default(uuid())
+  medicineId    String            @map("medicine_id")
+  batchId       String?           @map("batch_id")
+  movementType  StockMovementType @map("movement_type")
+  quantity      Int // positive = increase, negative = decrease
+  referenceId   String?           @map("reference_id") // e.g. order id, transfer id
+  referenceType String?           @map("reference_type") // e.g. "ORDER", "TRANSFER"
+  reason        String?
+  performedById String?           @map("performed_by_id")
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  medicine    Medicine @relation(fields: [medicineId], references: [id])
+  batch       Batch?   @relation(fields: [batchId], references: [id])
+  performedBy User?    @relation(fields: [performedById], references: [id])
+
+  @@index([medicineId])
+  @@index([referenceType, referenceId])
+  @@map("stock_movements")
+}
+
+// ============================================================================
+// PRESCRIPTIONS  (added — required for Rx-gated checkout)
+// ============================================================================
+
+model Prescription {
+  id           String             @id @default(uuid())
+  orderId      String             @map("order_id")
+  imageUrls    String[]           @map("image_urls")
+  status       PrescriptionStatus @default(PENDING_REVIEW)
+  reviewedById String?            @map("reviewed_by_id")
+  reviewedAt   DateTime?          @map("reviewed_at")
+  notes        String?
+  createdAt    DateTime           @default(now()) @map("created_at")
+
+  order      Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("ReviewedByUser", fields: [reviewedById], references: [id])
+
+  @@index([orderId])
+  @@map("prescriptions")
+}
+
+// ============================================================================
+// ORDERS
+// ============================================================================
+
+model Order {
+  id                 String              @id @default(uuid())
+  orderNumber        String              @unique @map("order_number")
+  customerId         String              @map("customer_id")
+  branchId           String              @map("branch_id")
+  addressId          String              @map("address_id")
+
+  status             OrderStatus         @default(PENDING_CONFIRMATION)
+  paymentMethodId    String              @map("payment_method_id")
+  paymentStatus       PaymentStatus       @default(PENDING) @map("payment_status")
+  prescriptionStatus  PrescriptionStatus  @default(NOT_REQUIRED) @map("prescription_status")
+
+  subtotal      Decimal @db.Decimal(10, 2)
+  deliveryFee   Decimal @default(0) @db.Decimal(10, 2) @map("delivery_fee")
+  discountTotal Decimal @default(0) @db.Decimal(10, 2) @map("discount_total")
+  total         Decimal @db.Decimal(10, 2)
+
+  deliveryAddressText String   @map("delivery_address_text") // snapshot, don't rely solely on Address FK
+  deliveryLocation     Unsupported("geography(Point, 4326)")
+
+  cancelReason String?   @map("cancel_reason")
+  confirmedAt  DateTime? @map("confirmed_at")
+  deliveredAt  DateTime? @map("delivered_at")
+  cancelledAt  DateTime? @map("cancelled_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  customer      User           @relation("CustomerOrders", fields: [customerId], references: [id])
+  branch        PharmacyBranch @relation(fields: [branchId], references: [id])
+  address       Address        @relation(fields: [addressId], references: [id])
+  paymentMethod PaymentMethod  @relation(fields: [paymentMethodId], references: [id])
+
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+  prescriptions Prescription[]
+  payment       Payment?
+  refunds       Refund[]
+  review        Review?
+  couponUsages  CouponUsage[]
+  deliveryRun   DeliveryRun?
+
+  @@index([customerId, createdAt])
+  @@index([branchId, status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String  @id @default(uuid())
+  orderId    String  @map("order_id")
+  medicineId String  @map("medicine_id")
+
+  medicineNameSnapshot String  @map("medicine_name_snapshot")
+  unitPriceSnapshot    Decimal @db.Decimal(10, 2) @map("unit_price_snapshot")
+  quantity             Int
+  subtotal             Decimal @db.Decimal(10, 2)
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id          String      @id @default(uuid())
+  orderId     String      @map("order_id")
+  status      OrderStatus
+  changedById String?     @map("changed_by_id")
+  note        String?
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy User? @relation(fields: [changedById], references: [id])
+
+  @@index([orderId])
+  @@map("order_status_history")
+}
+
+// In-house courier delivery run for an order (courier = pharmacy_staff w/ role COURIER)
+model DeliveryRun {
+  id              String    @id @default(uuid())
+  orderId         String    @unique @map("order_id")
+  courierStaffId  String    @map("courier_staff_id")
+  assignedAt      DateTime  @default(now()) @map("assigned_at")
+  pickedUpAt      DateTime? @map("picked_up_at")
+  deliveredAt     DateTime? @map("delivered_at")
+  currentLocation Unsupported("geography(Point, 4326)")?
+
+  order  Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  courier PharmacyStaff @relation(fields: [courierStaffId], references: [id])
+
+  @@index([courierStaffId])
+  @@map("delivery_runs")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  orderId   String   @unique @map("order_id")
+  userId    String   @map("user_id")
+  branchId  String   @map("branch_id")
+  rating    Int // 1-5, CHECK constraint in raw SQL migration
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order  Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user   User           @relation(fields: [userId], references: [id])
+  branch PharmacyBranch @relation(fields: [branchId], references: [id])
+
+  @@index([branchId])
+  @@map("reviews")
+}
+
+// ============================================================================
+// PAYMENTS
+// ============================================================================
+
+// Admin-configurable list of enabled payment methods (MVP: cash, visa-on-delivery,
+// instapay; Paymob card/wallet added later without a code deploy).
+model PaymentMethod {
+  id       String  @id @default(uuid())
+  code     String  @unique // "CASH", "VISA_ON_DELIVERY", "INSTAPAY", "PAYMOB_CARD"...
+  name     String
+  isActive Boolean @default(true) @map("is_active")
+  sortOrder Int    @default(0) @map("sort_order")
+
+  orders   Order[]
+  payments Payment[]
+
+  @@map("payment_methods")
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  orderId         String        @unique @map("order_id")
+  paymentMethodId String        @map("payment_method_id")
+  amount          Decimal       @db.Decimal(10, 2)
+  status          PaymentStatus @default(PENDING)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  order         Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod       @relation(fields: [paymentMethodId], references: [id])
+  transactions  PaymentTransaction[]
+
+  @@map("payments")
+}
+
+model PaymentTransaction {
+  id                    String   @id @default(uuid())
+  paymentId             String   @map("payment_id")
+  providerTransactionId String?  @unique @map("provider_transaction_id") // idempotency key
+  status                PaymentStatus
+  rawResponse           Json?    @map("raw_response")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  payment Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  refunds Refund[]
+
+  @@index([paymentId])
+  @@map("payment_transactions")
+}
+
+// Raw provider callback log, independent of interpreted transaction state.
+model PaymentWebhook {
+  id              String    @id @default(uuid())
+  provider        String // "PAYMOB", "INSTAPAY"
+  payload         Json
+  signatureValid  Boolean   @default(false) @map("signature_valid")
+  processedAt     DateTime? @map("processed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@map("payment_webhooks")
+}
+
+model Refund {
+  id                    String       @id @default(uuid())
+  orderId               String       @map("order_id")
+  paymentTransactionId  String?      @map("payment_transaction_id") // reverses the specific attempt, not just the order
+  amount                Decimal      @db.Decimal(10, 2)
+  reason                String?
+  status                RefundStatus @default(PENDING)
+  processedById         String?      @map("processed_by_id")
+  createdAt             DateTime     @default(now()) @map("created_at")
+
+  order              Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentTransaction PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id])
+  processedBy        User?               @relation(fields: [processedById], references: [id])
+
+  @@index([orderId])
+  @@map("refunds")
+}
+
+// ============================================================================
+// COUPONS / PROMOTIONS / CAMPAIGNS
+// ============================================================================
+
+model Coupon {
+  id               String       @id @default(uuid())
+  code             String       @unique
+  discountType     DiscountType @map("discount_type")
+  discountValue    Decimal      @db.Decimal(10, 2) @map("discount_value")
+  maxUses          Int?         @map("max_uses")
+  maxUsesPerUser   Int?         @map("max_uses_per_user")
+  minOrderAmount   Decimal?     @db.Decimal(10, 2) @map("min_order_amount")
+  validFrom        DateTime     @map("valid_from")
+  validTo          DateTime     @map("valid_to")
+  isActive         Boolean      @default(true) @map("is_active")
+
+  usages CouponUsage[]
+
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id        String   @id @default(uuid())
+  couponId  String   @map("coupon_id")
+  userId    String   @map("user_id")
+  orderId   String   @map("order_id")
+  usedAt    DateTime @default(now()) @map("used_at")
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id])
+
+  @@unique([couponId, orderId])
+  @@map("coupon_usages")
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+
+  promotions Promotion[]
+
+  @@map("campaigns")
+}
+
+model Promotion {
+  id            String       @id @default(uuid())
+  campaignId    String?      @map("campaign_id")
+  name          String
+  discountType  DiscountType @map("discount_type")
+  discountValue Decimal      @db.Decimal(10, 2) @map("discount_value")
+  startDate     DateTime     @map("start_date")
+  endDate       DateTime     @map("end_date")
+  isActive      Boolean      @default(true) @map("is_active")
+
+  campaign Campaign?          @relation(fields: [campaignId], references: [id])
+  products PromotionProduct[]
+
+  @@index([campaignId])
+  @@map("promotions")
+}
+
+model PromotionProduct {
+  id          String @id @default(uuid())
+  promotionId String @map("promotion_id")
+  medicineId  String @map("medicine_id")
+
+  promotion Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  medicine  Medicine  @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, medicineId])
+  @@map("promotion_products")
+}
+
+// ============================================================================
+// AUDIT
+// ============================================================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @map("actor_id")
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  action     String // "CREATE", "UPDATE", "DELETE", "STATUS_CHANGE"...
+  beforeData Json?    @map("before_data")
+  afterData  Json?    @map("after_data")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@map("audit_logs")
+}
