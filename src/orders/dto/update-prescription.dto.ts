@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { OmitType, PartialType } from '@nestjs/mapped-types';
 import { CreatePrescriptionDto } from './create-prescription.dto';
 
 /**
@@ -7,4 +7,6 @@ import { CreatePrescriptionDto } from './create-prescription.dto';
  * from the body. The service restores stock on REJECTED (see
  * `domain-notes.md` §2).
  */
-export class UpdatePrescriptionDto extends PartialType(CreatePrescriptionDto) {}
+export class UpdatePrescriptionDto extends PartialType(
+  OmitType(CreatePrescriptionDto, ['orderId', 'imageUrls'] as const),
+) {}

@@ -120,8 +120,8 @@ enum DiscountType {
 // ============================================================================
 
 model Permission {
-  id          String   @id @default(uuid())
-  code        String   @unique // e.g. "orders.view", "medicines.edit"
+  id          String  @id @default(uuid())
+  code        String  @unique // e.g. "orders.view", "medicines.edit"
   description String?
 
   profilePermissions ProfilePermission[]
@@ -131,8 +131,8 @@ model Permission {
 }
 
 model Profile {
-  id          String   @id @default(uuid())
-  name        String   @unique // e.g. "ADMIN", "SUPPORT", "PHARMACY_MANAGER"
+  id          String  @id @default(uuid())
+  name        String  @unique // e.g. "ADMIN", "SUPPORT", "PHARMACY_MANAGER"
   description String?
 
   permissions ProfilePermission[]
@@ -181,15 +181,15 @@ model UserPermission {
 // ============================================================================
 
 model User {
-  id           String   @id @default(uuid())
-  phone        String   @unique
-  email        String?  @unique
-  passwordHash String?  @map("password_hash")
-  fullName     String   @map("full_name")
-  userType     UserType @default(CUSTOMER) @map("user_type")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id           String    @id @default(uuid())
+  phone        String    @unique
+  email        String?   @unique
+  passwordHash String?   @map("password_hash")
+  fullName     String    @map("full_name")
+  userType     UserType  @default(CUSTOMER) @map("user_type")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
 
   profiles         UserProfile[]
@@ -242,7 +242,7 @@ model DeviceToken {
   platform  DevicePlatform
   createdAt DateTime       @default(now()) @map("created_at")
 
-  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   logs NotificationLog[]
 
   @@index([userId])
@@ -375,13 +375,13 @@ model PharmacyBranch {
   longitude            Decimal      @db.Decimal(9, 6)
   deliveryRadiusMeters Int          @default(5000) @map("delivery_radius_meters")
   openingHours         Json?        @map("opening_hours")
-  ratingAvg            Decimal      @default(0) @db.Decimal(2, 1) @map("rating_avg")
+  ratingAvg            Decimal      @default(0) @map("rating_avg") @db.Decimal(2, 1)
   ratingCount          Int          @default(0) @map("rating_count")
   createdAt            DateTime     @default(now()) @map("created_at")
   updatedAt            DateTime     @updatedAt @map("updated_at")
   deletedAt            DateTime?    @map("deleted_at")
 
-  pharmacy      Pharmacy         @relation(fields: [pharmacyId], references: [id])
+  pharmacy      Pharmacy          @relation(fields: [pharmacyId], references: [id])
   staff         PharmacyStaff[]
   deliveryZones DeliveryZone[]
   inventory     BranchInventory[]
@@ -417,7 +417,7 @@ model DeliveryZone {
   name        String
   // GeoJSON polygon (string) — keep plain until PostGIS is reintroduced.
   areaPolygon String? @map("area_polygon") @db.Text
-  deliveryFee Decimal @default(0) @db.Decimal(10, 2) @map("delivery_fee")
+  deliveryFee Decimal @default(0) @map("delivery_fee") @db.Decimal(10, 2)
 
   branch PharmacyBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
@@ -435,7 +435,7 @@ model PharmacyWarehouse {
   longitude   Decimal  @db.Decimal(9, 6)
   createdAt   DateTime @default(now()) @map("created_at")
 
-  pharmacy Pharmacy            @relation(fields: [pharmacyId], references: [id])
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
   batches  Batch[]
 
   @@index([pharmacyId])
@@ -507,28 +507,28 @@ model ActiveIngredient {
 }
 
 model Medicine {
-  id                   String   @id @default(uuid())
+  id                   String    @id @default(uuid())
   name                 String
-  nameAr               String?  @map("name_ar")
-  genericName          String?  @map("generic_name")
-  brandId              String?  @map("brand_id")
-  manufacturerId       String?  @map("manufacturer_id")
-  medicineTypeId       String?  @map("medicine_type_id")
-  categoryId           String?  @map("category_id")
-  dosageUnitId         String?  @map("dosage_unit_id")
+  nameAr               String?   @map("name_ar")
+  genericName          String?   @map("generic_name")
+  brandId              String?   @map("brand_id")
+  manufacturerId       String?   @map("manufacturer_id")
+  medicineTypeId       String?   @map("medicine_type_id")
+  categoryId           String?   @map("category_id")
+  dosageUnitId         String?   @map("dosage_unit_id")
   strength             String?
-  barcode              String?  @unique
-  requiresPrescription Boolean  @default(false) @map("requires_prescription")
-  isControlled         Boolean  @default(false) @map("is_controlled")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  barcode              String?   @unique
+  requiresPrescription Boolean   @default(false) @map("requires_prescription")
+  isControlled         Boolean   @default(false) @map("is_controlled")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
   deletedAt            DateTime? @map("deleted_at")
 
-  brand             Brand?                    @relation(fields: [brandId], references: [id])
-  manufacturer      Manufacturer?             @relation(fields: [manufacturerId], references: [id])
-  medicineType      MedicineType?             @relation(fields: [medicineTypeId], references: [id])
-  category          Category?                 @relation(fields: [categoryId], references: [id])
-  dosageUnit        DosageUnit?               @relation(fields: [dosageUnitId], references: [id])
+  brand             Brand?                     @relation(fields: [brandId], references: [id])
+  manufacturer      Manufacturer?              @relation(fields: [manufacturerId], references: [id])
+  medicineType      MedicineType?              @relation(fields: [medicineTypeId], references: [id])
+  category          Category?                  @relation(fields: [categoryId], references: [id])
+  dosageUnit        DosageUnit?                @relation(fields: [dosageUnitId], references: [id])
   activeIngredients MedicineActiveIngredient[]
   images            MedicineImage[]
   batches           Batch[]
@@ -574,28 +574,28 @@ model MedicineImage {
 // ============================================================================
 
 model Batch {
-  id            String            @id @default(uuid())
-  medicineId    String            @map("medicine_id")
-  locationType  BatchLocationType @map("location_type")
-  warehouseId   String?           @map("warehouse_id") // set when locationType = WAREHOUSE
-  branchId      String?           @map("branch_id")    // set when locationType = BRANCH
-  batchNumber   String            @map("batch_number")
-  expiryDate    DateTime          @map("expiry_date")
-  quantity      Int
-  costPrice     Decimal           @db.Decimal(10, 2) @map("cost_price")
-  createdAt     DateTime          @default(now()) @map("created_at")
+  id           String            @id @default(uuid())
+  medicineId   String            @map("medicine_id")
+  locationType BatchLocationType @map("location_type")
+  warehouseId  String?           @map("warehouse_id") // set when locationType = WAREHOUSE
+  branchId     String?           @map("branch_id") // set when locationType = BRANCH
+  batchNumber  String            @map("batch_number")
+  expiryDate   DateTime          @map("expiry_date")
+  quantity     Int
+  costPrice    Decimal           @map("cost_price") @db.Decimal(10, 2)
+  createdAt    DateTime          @default(now()) @map("created_at")
 
-  medicine   Medicine            @relation(fields: [medicineId], references: [id])
-  warehouse  PharmacyWarehouse?  @relation(fields: [warehouseId], references: [id])
-  branch     PharmacyBranch?     @relation(fields: [branchId], references: [id])
-  movements  StockMovement[]
+  medicine  Medicine           @relation(fields: [medicineId], references: [id])
+  warehouse PharmacyWarehouse? @relation(fields: [warehouseId], references: [id])
+  branch    PharmacyBranch?    @relation(fields: [branchId], references: [id])
+  movements StockMovement[]
+  // NOTE: add CHECK constraint in raw SQL migration:
+  // exactly one of warehouse_id / branch_id must be non-null, matching location_type
 
   @@index([medicineId, expiryDate]) // FEFO lookups
   @@index([warehouseId])
   @@index([branchId])
   @@map("batches")
-  // NOTE: add CHECK constraint in raw SQL migration:
-  // exactly one of warehouse_id / branch_id must be non-null, matching location_type
 }
 
 // Fast, checkout-facing "what can this branch sell right now" table.
@@ -680,26 +680,26 @@ model Prescription {
 // ============================================================================
 
 model Order {
-  id                 String              @id @default(uuid())
-  orderNumber        String              @unique @map("order_number")
-  customerId         String              @map("customer_id")
-  branchId           String              @map("branch_id")
-  addressId          String              @map("address_id")
+  id          String @id @default(uuid())
+  orderNumber String @unique @map("order_number")
+  customerId  String @map("customer_id")
+  branchId    String @map("branch_id")
+  addressId   String @map("address_id")
 
-  status              OrderStatus        @default(PENDING_CONFIRMATION)
-  paymentMethodId     String             @map("payment_method_id")
-  paymentStatus       PaymentStatus      @default(PENDING) @map("payment_status")
-  prescriptionStatus  PrescriptionStatus @default(NOT_REQUIRED) @map("prescription_status")
+  status             OrderStatus        @default(PENDING_CONFIRMATION)
+  paymentMethodId    String             @map("payment_method_id")
+  paymentStatus      PaymentStatus      @default(PENDING) @map("payment_status")
+  prescriptionStatus PrescriptionStatus @default(NOT_REQUIRED) @map("prescription_status")
 
   subtotal      Decimal @db.Decimal(10, 2)
-  deliveryFee   Decimal @default(0) @db.Decimal(10, 2) @map("delivery_fee")
-  discountTotal Decimal @default(0) @db.Decimal(10, 2) @map("discount_total")
+  deliveryFee   Decimal @default(0) @map("delivery_fee") @db.Decimal(10, 2)
+  discountTotal Decimal @default(0) @map("discount_total") @db.Decimal(10, 2)
   total         Decimal @db.Decimal(10, 2)
 
-  deliveryAddressText String   @map("delivery_address_text") // snapshot, don't rely solely on Address FK
+  deliveryAddressText String  @map("delivery_address_text") // snapshot, don't rely solely on Address FK
   // Plain lat/lng snapshot of delivery location at order time
-  deliveryLatitude    Decimal  @db.Decimal(9, 6) @map("delivery_latitude")
-  deliveryLongitude   Decimal  @db.Decimal(9, 6) @map("delivery_longitude")
+  deliveryLatitude    Decimal @map("delivery_latitude") @db.Decimal(9, 6)
+  deliveryLongitude   Decimal @map("delivery_longitude") @db.Decimal(9, 6)
 
   cancelReason String?   @map("cancel_reason")
   confirmedAt  DateTime? @map("confirmed_at")
@@ -728,12 +728,12 @@ model Order {
 }
 
 model OrderItem {
-  id         String  @id @default(uuid())
-  orderId    String  @map("order_id")
-  medicineId String  @map("medicine_id")
+  id         String @id @default(uuid())
+  orderId    String @map("order_id")
+  medicineId String @map("medicine_id")
 
   medicineNameSnapshot String  @map("medicine_name_snapshot")
-  unitPriceSnapshot    Decimal @db.Decimal(10, 2) @map("unit_price_snapshot")
+  unitPriceSnapshot    Decimal @map("unit_price_snapshot") @db.Decimal(10, 2)
   quantity             Int
   subtotal             Decimal @db.Decimal(10, 2)
 
@@ -761,18 +761,18 @@ model OrderStatusHistory {
 
 // In-house courier delivery run for an order (courier = pharmacy_staff w/ role COURIER)
 model DeliveryRun {
-  id              String    @id @default(uuid())
-  orderId         String    @unique @map("order_id")
-  courierStaffId  String    @map("courier_staff_id")
-  assignedAt      DateTime  @default(now()) @map("assigned_at")
-  pickedUpAt      DateTime? @map("picked_up_at")
-  deliveredAt     DateTime? @map("delivered_at")
+  id               String    @id @default(uuid())
+  orderId          String    @unique @map("order_id")
+  courierStaffId   String    @map("courier_staff_id")
+  assignedAt       DateTime  @default(now()) @map("assigned_at")
+  pickedUpAt       DateTime? @map("picked_up_at")
+  deliveredAt      DateTime? @map("delivered_at")
   // Plain lat/lng for the courier's last known location.
-  currentLatitude  Decimal? @db.Decimal(9, 6) @map("current_latitude")
-  currentLongitude Decimal? @db.Decimal(9, 6) @map("current_longitude")
+  currentLatitude  Decimal?  @map("current_latitude") @db.Decimal(9, 6)
+  currentLongitude Decimal?  @map("current_longitude") @db.Decimal(9, 6)
 
-  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  courier PharmacyStaff  @relation(fields: [courierStaffId], references: [id])
+  order   Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  courier PharmacyStaff @relation(fields: [courierStaffId], references: [id])
 
   @@index([courierStaffId])
   @@map("delivery_runs")
@@ -831,12 +831,12 @@ model Payment {
 }
 
 model PaymentTransaction {
-  id                    String   @id @default(uuid())
-  paymentId             String   @map("payment_id")
-  providerTransactionId String?  @unique @map("provider_transaction_id") // idempotency key
+  id                    String        @id @default(uuid())
+  paymentId             String        @map("payment_id")
+  providerTransactionId String?       @unique @map("provider_transaction_id") // idempotency key
   status                PaymentStatus
-  rawResponse           Json?    @map("raw_response")
-  createdAt             DateTime @default(now()) @map("created_at")
+  rawResponse           Json?         @map("raw_response")
+  createdAt             DateTime      @default(now()) @map("created_at")
 
   payment Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   refunds Refund[]
@@ -867,9 +867,9 @@ model Refund {
   processedById        String?      @map("processed_by_id")
   createdAt            DateTime     @default(now()) @map("created_at")
 
-  order              Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order              Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
   paymentTransaction PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id])
-  processedBy        User?                @relation(fields: [processedById], references: [id])
+  processedBy        User?               @relation(fields: [processedById], references: [id])
 
   @@index([orderId])
   @@map("refunds")
@@ -883,10 +883,10 @@ model Coupon {
   id             String       @id @default(uuid())
   code           String       @unique
   discountType   DiscountType @map("discount_type")
-  discountValue  Decimal      @db.Decimal(10, 2) @map("discount_value")
+  discountValue  Decimal      @map("discount_value") @db.Decimal(10, 2)
   maxUses        Int?         @map("max_uses")
   maxUsesPerUser Int?         @map("max_uses_per_user")
-  minOrderAmount Decimal?     @db.Decimal(10, 2) @map("min_order_amount")
+  minOrderAmount Decimal?     @map("min_order_amount") @db.Decimal(10, 2)
   validFrom      DateTime     @map("valid_from")
   validTo        DateTime     @map("valid_to")
   isActive       Boolean      @default(true) @map("is_active")
@@ -928,12 +928,12 @@ model Promotion {
   campaignId    String?      @map("campaign_id")
   name          String
   discountType  DiscountType @map("discount_type")
-  discountValue Decimal      @db.Decimal(10, 2) @map("discount_value")
+  discountValue Decimal      @map("discount_value") @db.Decimal(10, 2)
   startDate     DateTime     @map("start_date")
   endDate       DateTime     @map("end_date")
   isActive      Boolean      @default(true) @map("is_active")
 
-  campaign Campaign?         @relation(fields: [campaignId], references: [id])
+  campaign Campaign?          @relation(fields: [campaignId], references: [id])
   products PromotionProduct[]
 
   @@index([campaignId])

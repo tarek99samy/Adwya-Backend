@@ -1,8 +1,8 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 
 export class NotificationFilterDto {
-  @IsString()
+  @IsUUID()
   @IsOptional()
   userId?: string;
 

@@ -15,6 +15,7 @@ export class CouponFilterDto {
 
   @IsOptional()
   @Type(() => Boolean)
+  @IsBoolean()
   isActive?: boolean;
 
   @IsInt()

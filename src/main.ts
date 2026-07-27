@@ -40,4 +40,11 @@ async function bootstrap(): Promise<void> {
   Logger.log(`Adwya backend listening on http://localhost:${port}`, 'Bootstrap');
 }
 
-void bootstrap();
+// Catch any bootstrap failure (Prisma connect, port in use, etc.) and exit
+// with a non-zero code instead of an unhandled rejection. Without this a
+// missing Postgres would print a stack trace and leave the process hung.
+bootstrap().catch((err: unknown) => {
+  const message = err instanceof Error ? err.message : String(err);
+  Logger.error(`Bootstrap failed: ${message}`, 'Bootstrap');
+  process.exit(1);
+});

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsDateString, IsNumber, IsOptional, IsUUID, Min } from 'class-validator';
 
 export class CreatePriceHistoryDto {
   @IsUUID()
@@ -18,5 +18,6 @@ export class CreatePriceHistoryDto {
    * ISO-8601 string.
    */
   @IsOptional()
+  @IsDateString()
   effectiveFrom?: string;
 }

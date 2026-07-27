@@ -1,5 +1,5 @@
+import { OmitType, PartialType } from '@nestjs/mapped-types';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
-import { PartialType } from '@nestjs/mapped-types';
 import { CreateOrderDto } from './create-order.dto';
 
 /**
@@ -9,7 +9,18 @@ import { CreateOrderDto } from './create-order.dto';
  * and `cancelledAt` server-side. Status changes go through dedicated
  * transition endpoints, not this generic PATCH.
  */
-export class UpdateOrderDto extends PartialType(CreateOrderDto) {
+export class UpdateOrderDto extends PartialType(
+  OmitType(CreateOrderDto, [
+    'branchId',
+    'addressId',
+    'paymentMethodId',
+    'prescriptionImageUrls',
+    'couponCode',
+    'deliveryLatitude',
+    'deliveryLongitude',
+    'deliveryNote',
+  ] as const),
+) {
   @IsOptional()
   @IsString()
   @MaxLength(500)

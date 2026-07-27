@@ -22,8 +22,12 @@ export class AppConfig {
   @IsOptional()
   PORT: number = 3000;
 
+  // Optional at the config layer: a missing DB URL is allowed so the app can
+  // boot in a DB-less dev mode (DTO work, healthcheck, swagger). Prisma will
+  // throw at $connect() time when the URL is actually needed.
   @IsString()
-  DATABASE_URL!: string;
+  @IsOptional()
+  DATABASE_URL?: string;
 
   // JWT — optional at this stage, will be required once auth module lands.
   @IsString()

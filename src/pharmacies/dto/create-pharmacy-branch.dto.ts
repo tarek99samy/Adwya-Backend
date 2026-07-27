@@ -6,6 +6,7 @@ import {
   IsLongitude,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -14,7 +15,7 @@ import { BranchStatus } from '../../common/enums';
 import { IsEgyptianPhone } from '../../common/validators';
 
 export class CreatePharmacyBranchDto {
-  @IsString()
+  @IsUUID()
   pharmacyId!: string; // uuid
 
   @IsString()

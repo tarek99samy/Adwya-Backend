@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 
 export class MedicineFilterDto {
   @IsUUID()
@@ -16,6 +16,7 @@ export class MedicineFilterDto {
 
   @IsOptional()
   @Type(() => Boolean)
+  @IsBoolean()
   requiresPrescription?: boolean;
 
   @IsString()

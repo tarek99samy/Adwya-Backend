@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -37,6 +38,7 @@ export class CreateRefundDto {
   reason?: string;
 
   @IsOptional()
+  @IsEnum(RefundStatus)
   // Defaults to PENDING; an admin-issued refund is usually PENDING then moves
   // to APPROVED → COMPLETED via the service layer.
   status?: RefundStatus;

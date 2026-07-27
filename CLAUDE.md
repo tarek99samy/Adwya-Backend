@@ -39,13 +39,6 @@ npm run build && npm run start:prod   # serves compiled dist/
 # lint (auto-fix) and format
 npm run lint
 npm run format
-
-# tests
-npm run test              # unit tests (src/**/*.spec.ts)
-npm run test:watch        # unit tests in watch mode
-npm run test:cov          # unit tests + coverage to ../coverage
-npm run test:e2e          # e2e tests (test/**/*.e2e-spec.ts) using test/jest-e2e.json
-npm run test:debug        # run jest with --inspect-brk
 ```
 
 To run a single unit test file, narrow Jest's pattern: `npx jest src/path/to/file.spec.ts` (or `npm run test -- src/path/to/file.spec.ts`). For a single e2e file, use `npx jest --config ./test/jest-e2e.json test/path/to/file.e2e-spec.ts`.

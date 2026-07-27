@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEnum, IsLatitude, IsLongitude, IsOptional } from 'class-validator';
+import { IsEnum, IsLatitude, IsLongitude, IsOptional, IsUUID } from 'class-validator';
 import { BranchStatus } from '../../common/enums';
 
 export class PharmacyBranchFilterDto {
@@ -7,6 +7,7 @@ export class PharmacyBranchFilterDto {
   @IsOptional()
   status?: BranchStatus;
 
+  @IsUUID()
   @IsOptional()
   pharmacyId?: string;
 

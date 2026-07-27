@@ -1,5 +1,5 @@
+import { OmitType, PartialType } from '@nestjs/mapped-types';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
-import { PartialType } from '@nestjs/mapped-types';
 import { CreateReviewDto } from './create-review.dto';
 
 /**
@@ -7,7 +7,9 @@ import { CreateReviewDto } from './create-review.dto';
  * the comment can be edited, and only within a short window after creation
  * (enforced by the service, not here).
  */
-export class UpdateReviewDto extends PartialType(CreateReviewDto) {
+export class UpdateReviewDto extends PartialType(
+  OmitType(CreateReviewDto, ['orderId', 'userId', 'branchId', 'rating'] as const),
+) {
   @IsOptional()
   @IsString()
   @MaxLength(2000)
