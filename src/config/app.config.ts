@@ -1,13 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import {
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  IsUrl,
-  Min,
-  validateSync,
-} from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, IsUrl, Min, validateSync } from 'class-validator';
 
 export enum NodeEnv {
   Development = 'development',
@@ -57,9 +49,7 @@ export function validateEnv(config: Record<string, unknown>): AppConfig {
     forbidUnknownValues: false,
   });
   if (errors.length > 0) {
-    const messages = errors
-      .map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`)
-      .join('\n  ');
+    const messages = errors.map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`).join('\n  ');
     throw new Error(`Invalid environment configuration:\n  ${messages}`);
   }
   return validated;

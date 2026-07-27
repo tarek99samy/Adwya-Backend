@@ -2,6 +2,8 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import cookieParser from 'cookie-parser';
+import { GlobalHttpExceptionFilter } from './common/exception-filter';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
@@ -9,7 +11,9 @@ async function bootstrap(): Promise<void> {
     // makes early DTO errors fail loud at request time too.
     bufferLogs: false,
   });
-
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  app.use(cookieParser());
+  app.useGlobalFilters(new GlobalHttpExceptionFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // strip unknown properties
@@ -18,6 +22,11 @@ async function bootstrap(): Promise<void> {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
+
+  app.enableCors({
+    origin: '*',
+    credentials: true,
+  });
 
   // Health endpoint: useful as a container probe; doesn't depend on the DB
   // so it returns 200 even before migrations run.
