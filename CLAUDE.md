@@ -69,4 +69,9 @@ test/
 - TypeScript: `noImplicitAny`, `strictBindCallApply`, and `noFallthroughCasesInSwitch` are off; `strictNullChecks` is on. Prefer `import type { ... }` for type-only imports (NodeNext + `isolatedModules`).
 - `.env*` files are gitignored; load env via standard mechanisms (e.g. `@nestjs/config` when added) before reading `process.env` outside `main.ts`.
 </content>
+
 </invoke>
+
+## Memory files path
+
+All memory files having last sessions work are saved under this folder `C:\Users\tarek\.claude\projects\D--pharma-project-Adwya-Backend\memory\*`

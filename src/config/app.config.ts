@@ -29,14 +29,28 @@ export class AppConfig {
   @IsOptional()
   DATABASE_URL?: string;
 
-  // JWT — optional at this stage, will be required once auth module lands.
+  // JWT — split into access + refresh so we can rotate them independently.
+  // Optional at config layer; AuthModule supplies dev fallbacks so the app
+  // boots even when secrets aren't set (DB-less dev mode, tests).
   @IsString()
   @IsOptional()
-  JWT_SECRET?: string;
+  JWT_ACCESS_SECRET?: string;
 
   @IsString()
   @IsOptional()
-  JWT_EXPIRES_IN?: string = '7d';
+  JWT_REFRESH_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  JWT_ACCESS_EXPIRES_IN?: string = '15m';
+
+  @IsString()
+  @IsOptional()
+  JWT_REFRESH_EXPIRES_IN?: string = '14d';
+
+  @IsString()
+  @IsOptional()
+  PASSWORD_RESET_EXPIRES_IN?: string = '15m';
 
   // App-level URL used for absolute links (e.g. WhatsApp deep links).
   @IsUrl({ require_tld: false })

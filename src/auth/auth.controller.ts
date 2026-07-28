@@ -1,84 +1,81 @@
-// import type { Response } from 'express';
-// import { Body, Controller, HttpCode, HttpStatus, Post, Get, Req, UseGuards, Res, Logger } from '@nestjs/common';
-// import { ThrottlerGuard } from '@nestjs/throttler';
-// import { randomUUID } from 'crypto';
-// import { AuthService } from './auth.service';
-// import { LoginDto } from './dto/login.dto';
-// import { SignupDto } from './dto/signup.dto';
-// import { VerifyUserDto, VerifyQuestionDto } from './dto/reset-password.dto';
-// import { ResetPasswordDto } from './dto/reset-password.dto';
-// import AuthGuard from './auth.guard';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+} from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { AuthService } from './auth.service';
+import { LoginDto } from './dto/login.dto';
+import { SignupDto } from './dto/signup.dto';
+import {
+  RefreshTokenDto,
+  RequestPasswordResetDto,
+  ResetPasswordDto,
+} from './dto/reset-password.dto';
+import { Public } from './decorators/public.decorator';
+import { CurrentUser } from '../rbac/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../rbac/decorators/current-user.decorator';
 
-// @Controller('auth')
-// @UseGuards(ThrottlerGuard)
-// export class AuthController {
-//   private logger = new Logger(AuthController.name);
-//   constructor(private authService: AuthService) {}
+@Controller('auth')
+@Throttle({ default: { limit: 20, ttl: 60_000 } })
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
 
-//   @Get('me')
-//   @UseGuards(AuthGuard)
-//   getMe(@Req() req: { email: string }) {
-//     return this.authService.getMe(req.email);
-//   }
+  @Public()
+  @Post('signup')
+  @HttpCode(HttpStatus.CREATED)
+  signup(@Body() dto: SignupDto) {
+    return this.authService.registerCustomer(dto);
+  }
 
-//   @Get('csrf-token')
-//   @HttpCode(HttpStatus.OK)
-//   @UseGuards(AuthGuard)
-//   getCsrfToken(@Res({ passthrough: true }) res: Response) {
-//     this.logger.log(`Generating new CSRF token`);
-//     const csrfToken = randomUUID();
-//     res.cookie('csrf_token', csrfToken, { httpOnly: false, secure: false, sameSite: 'strict' });
-//     return { csrfToken };
-//   }
+  @Public()
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  login(@Body() dto: LoginDto) {
+    return this.authService.login(dto.phone, dto.password);
+  }
 
-//   @Post('login')
-//   @HttpCode(HttpStatus.OK)
-//   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-//     const { access_token, user } = await this.authService.login(dto.email, dto.password);
-//     res.cookie('access_token', `Bearer ${access_token}`, { httpOnly: true, secure: false, sameSite: 'lax' });
+  @Public()
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refresh(dto.refreshToken);
+  }
 
-//     const csrfToken = randomUUID();
-//     res.cookie('csrf_token', csrfToken, { httpOnly: false, secure: false, sameSite: 'strict' });
+  @Public()
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@Body() dto: RefreshTokenDto) {
+    await this.authService.logout(dto.refreshToken);
+    return { message: 'Logged out' };
+  }
 
-//     return { user, csrfToken };
-//   }
+  /**
+   * Phase-1 forgot-password stub: phone → token. SMS/email wired in Phase 4.1.
+   * Returning the token lets the integration be tested end-to-end without an
+   * SMS provider.
+   */
+  @Public()
+  @Post('verify-user')
+  @HttpCode(HttpStatus.OK)
+  verifyUser(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(dto.phone);
+  }
 
-//   @Post('signup')
-//   @HttpCode(HttpStatus.CREATED)
-//   async signUp(@Body() dto: SignupDto, @Res({ passthrough: true }) res: Response) {
-//     const { access_token, user } = await this.authService.signUp(dto);
-//     res.cookie('access_token', `Bearer ${access_token}`, { httpOnly: true, secure: false, sameSite: 'lax' });
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.newPassword);
+    return { message: 'Password reset' };
+  }
 
-//     const csrfToken = randomUUID();
-//     res.cookie('csrf_token', csrfToken, { httpOnly: false, secure: false, sameSite: 'strict' });
-
-//     return { user, csrfToken };
-//   }
-
-//   @Post('verify-user')
-//   @HttpCode(HttpStatus.OK)
-//   async validateUser(@Body() dto: VerifyUserDto) {
-//     return this.authService.validateUser(dto.email);
-//   }
-
-//   @Post('verify-question')
-//   @HttpCode(HttpStatus.OK)
-//   async validateQuestion(@Body() dto: VerifyQuestionDto) {
-//     return this.authService.validateQuestion(dto.email, dto.answer);
-//   }
-
-//   @Post('reset-password')
-//   @HttpCode(HttpStatus.OK)
-//   async resetPassword(@Body() dto: ResetPasswordDto) {
-//     return this.authService.resetPassword(dto.email, dto.newPassword);
-//   }
-
-//   @Post('logout')
-//   @HttpCode(HttpStatus.OK)
-//   logout(@Res({ passthrough: true }) res: Response) {
-//     this.logger.log(`Logging out a user`);
-//     res.clearCookie('access_token', { httpOnly: true });
-//     res.clearCookie('csrf_token');
-//     return { message: 'Logged out' };
-//   }
-// }
+  /** Sanity-check the global JwtAuthGuard wiring. Requires a valid token. */
+  @Get('me')
+  me(@CurrentUser() user: AuthenticatedUser) {
+    return this.authService.getMe(user);
+  }
+}

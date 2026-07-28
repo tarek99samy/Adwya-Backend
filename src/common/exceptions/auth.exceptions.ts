@@ -18,6 +18,12 @@ export class EmailAlreadyInUseException extends ForbiddenException {
   }
 }
 
+export class PhoneAlreadyInUseException extends ForbiddenException {
+  constructor() {
+    super('Phone already in use');
+  }
+}
+
 export class UserNotFoundException extends NotFoundException {
   constructor() {
     super('User not found');

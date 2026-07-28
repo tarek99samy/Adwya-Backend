@@ -1,34 +1,31 @@
-// import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEgyptianPhone } from '../../common/validators';
 
-export class VerifyUserDto {
-  // @ApiProperty({ example: 'user@example.com', description: 'The email of the user to verify' })
-  @IsNotEmpty()
-  @IsEmail()
-  email: string;
-}
-
-export class VerifyQuestionDto {
-  // @ApiProperty({ example: 'user@example.com' })
-  @IsNotEmpty()
-  @IsEmail()
-  email: string;
-
-  // @ApiProperty({ example: 'MyAnswer' })
+/** First half of forgot-password: lookup by phone, returns a reset token. */
+export class RequestPasswordResetDto {
   @IsNotEmpty()
   @IsString()
-  answer: string;
+  @IsEgyptianPhone()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  phone!: string;
 }
 
+/** Second half: consume the reset token with a new password. */
 export class ResetPasswordDto {
-  // @ApiProperty({ example: 'user@example.com' })
   @IsNotEmpty()
-  @IsEmail()
-  email: string;
+  @IsString()
+  token!: string;
 
-  // @ApiProperty({ example: 'newStrongPassword123' })
-  @IsNotEmpty()
   @IsString()
   @MinLength(8)
-  newPassword: string;
+  @MaxLength(72)
+  newPassword!: string;
+}
+
+/** Body of POST /auth/refresh — the rotated refresh token. */
+export class RefreshTokenDto {
+  @IsNotEmpty()
+  @IsString()
+  refreshToken!: string;
 }

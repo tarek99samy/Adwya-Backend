@@ -192,22 +192,24 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
 
-  profiles         UserProfile[]
-  permissions      UserPermission[]
-  addresses        Address[]
-  deviceTokens     DeviceToken[]
-  favorites        Favorite[]
-  reviews          Review[]
-  notifications    Notification[]
-  cart             Cart?
-  orders           Order[]              @relation("CustomerOrders")
-  pharmacyStaff    PharmacyStaff?
-  reviewedRx       Prescription[]       @relation("ReviewedByUser")
-  orderStatusLogs  OrderStatusHistory[]
-  stockMovements   StockMovement[]
-  couponUsages     CouponUsage[]
-  processedRefunds Refund[]
-  auditLogs        AuditLog[]
+  profiles            UserProfile[]
+  permissions         UserPermission[]
+  addresses           Address[]
+  deviceTokens        DeviceToken[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  favorites           Favorite[]
+  reviews             Review[]
+  notifications       Notification[]
+  cart                Cart?
+  orders              Order[]              @relation("CustomerOrders")
+  pharmacyStaff       PharmacyStaff?
+  reviewedRx          Prescription[]       @relation("ReviewedByUser")
+  orderStatusLogs     OrderStatusHistory[]
+  stockMovements      StockMovement[]
+  couponUsages        CouponUsage[]
+  processedRefunds    Refund[]
+  auditLogs           AuditLog[]
 
   @@index([userType])
   @@map("users")
@@ -247,6 +249,40 @@ model DeviceToken {
 
   @@index([userId])
   @@map("device_tokens")
+}
+
+// Hashed refresh tokens issued at login. We persist the hash, not the token
+// itself, so a DB leak doesn't let an attacker mint new access tokens.
+// Rotation: on POST /auth/refresh we mark the old row revokedAt=now and
+// issue a fresh row.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// One-time tokens for password reset. UsedAt stamps prevent replay; expiresAt
+// caps the window. Same approach as refresh tokens — store the hash.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model Favorite {
