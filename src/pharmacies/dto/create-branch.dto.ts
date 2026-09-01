@@ -1,4 +1,4 @@
-import { OmitType } from '@nestjs/mapped-types';
+import { OmitType } from '@nestjs/swagger';  // swagger's variant keeps the schema metadata
 import { RegisterPharmacyDto } from './register-pharmacy.dto';
 
 /**

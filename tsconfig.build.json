@@ -9,6 +9,15 @@
     "migrations"
   ],
   "compilerOptions": {
-    "rootDir": "src"
+    "rootDir": "src",
+    /*
+     * tsconfig.json turns on `incremental`, and nest-cli.json sets
+     * `deleteOutDir: true`. Together they are unsound: the build wipes dist/,
+     * then tsc reads a .tsbuildinfo that says everything is already emitted and
+     * writes almost nothing, leaving a dist/ with no main.js and a build that
+     * reported success. Non-incremental here costs a few seconds and makes
+     * `npm run build` mean the same thing every time.
+     */
+    "incremental": false
   }
 }

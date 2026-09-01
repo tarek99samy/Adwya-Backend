@@ -1,4 +1,4 @@
-import { PickType } from '@nestjs/mapped-types';
+import { PickType } from '@nestjs/swagger';  // swagger's variant keeps the schema metadata
 import { CreateReviewDto } from './create-review.dto';
 
 /**

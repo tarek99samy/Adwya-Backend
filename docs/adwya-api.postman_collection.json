@@ -1,0 +1,2828 @@
+{
+  "info": {
+    "_postman_id": "adwya-backend-v1",
+    "name": "Adwya API (v1)",
+    "description": "# Adwya API\n\nPharmacy-delivery marketplace backend. Every endpoint below is generated\nfrom the live OpenAPI spec, so it matches the running server exactly.\n\n## Getting started\n\n1. Select the **Adwya - Local** environment (or set `baseUrl` yourself).\n2. Run **Auth / POST /v1/auth/signup** or **login**. The access and refresh\n   tokens are captured into collection variables automatically - every other\n   request picks them up.\n3. Browse **Catalog** for medicines, add one to the **Cart**, then\n   **Orders / POST /v1/orders/checkout**. Checkout stores `orderId` for you.\n\n## Conventions\n\n- All product endpoints are under `/v1`. `/healthz`, `/readyz` and `/metrics`\n  are deliberately unversioned.\n- Access tokens last 15 minutes; refresh tokens 14 days and rotate on use.\n- List endpoints return `{ data, meta: { total, page, limit } }`.\n- Errors return `{ statusCode, timestamp, path, error }` - see docs/API_ERRORS.md.\n- Unknown body fields are rejected with 400, not ignored.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "description": "Caller: infrastructure",
+      "item": [
+        {
+          "name": "GET /healthz",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/healthz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "healthz"
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /readyz",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/readyz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "readyz"
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Caller: anyone",
+      "item": [
+        {
+          "name": "GET /v1/auth/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Sanity-check the global JwtAuthGuard wiring. Requires a valid token.\n\n**Auth:** bearer token required.\n**Rate limit:** 20/min per IP (global default is 50/min)."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/auth/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.\n**Rate limit:** 20/min per IP (global default is 50/min).\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `phone` | string | yes |\n| `password` | string | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"01001234567\",\n  \"password\": \"Passw0rd!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b = pm.response.json();",
+                  "if (b.accessToken) pm.collectionVariables.set('accessToken', b.accessToken);",
+                  "if (b.refreshToken) pm.collectionVariables.set('refreshToken', b.refreshToken);",
+                  "if (b.user && b.user.id) pm.collectionVariables.set('userId', b.user.id);",
+                  "pm.test('authenticated', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /v1/auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.\n**Rate limit:** 20/min per IP (global default is 50/min).\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `refreshToken` | string | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/auth/refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.\n**Rate limit:** 20/min per IP (global default is 50/min).\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `refreshToken` | string | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b = pm.response.json();",
+                  "if (b.accessToken) pm.collectionVariables.set('accessToken', b.accessToken);",
+                  "if (b.refreshToken) pm.collectionVariables.set('refreshToken', b.refreshToken);",
+                  "if (b.user && b.user.id) pm.collectionVariables.set('userId', b.user.id);",
+                  "pm.test('authenticated', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /v1/auth/reset-password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.\n**Rate limit:** 20/min per IP (global default is 50/min).\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `token` | string | yes |\n| `newPassword` | string | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"NewPassw0rd!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/auth/signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "signup"
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.\n**Rate limit:** 20/min per IP (global default is 50/min).\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `phone` | string | yes |\n| `email` | string | no |\n| `password` | string | yes |\n| `fullName` | string | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"01001234567\",\n  \"password\": \"Passw0rd!\",\n  \"fullName\": \"Mostafa Kamel\",\n  \"email\": \"customer@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b = pm.response.json();",
+                  "if (b.accessToken) pm.collectionVariables.set('accessToken', b.accessToken);",
+                  "if (b.refreshToken) pm.collectionVariables.set('refreshToken', b.refreshToken);",
+                  "if (b.user && b.user.id) pm.collectionVariables.set('userId', b.user.id);",
+                  "pm.test('authenticated', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /v1/auth/verify-user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/verify-user",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "verify-user"
+              ]
+            },
+            "description": "Phase-1 forgot-password stub: phone → token. SMS/email wired in Phase 4.1.\nReturning the token lets the integration be tested end-to-end without an\nSMS provider.\n\n**Auth:** public — no token needed.\n**Rate limit:** 20/min per IP (global default is 50/min).\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `phone` | string | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"01001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Catalog",
+      "description": "Caller: anyone (public)",
+      "item": [
+        {
+          "name": "GET /v1/catalog/brands",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/catalog/brands",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog",
+                "brands"
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/catalog/categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/catalog/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog",
+                "categories"
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/catalog/medicines",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/catalog/medicines?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog",
+                "medicines"
+              ],
+              "query": [
+                {
+                  "key": "categoryId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "brandId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "manufacturerId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "requiresPrescription",
+                  "value": "",
+                  "description": "boolean",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "nearLatitude",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "nearLongitude",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/catalog/medicines/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/catalog/medicines/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "catalog",
+                "medicines",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Pharmacies",
+      "description": "Caller: anyone (public)",
+      "item": [
+        {
+          "name": "GET /v1/pharmacies/branches",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/pharmacies/branches?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "pharmacies",
+                "branches"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING_APPROVAL",
+                  "description": "one of: PENDING_APPROVAL, APPROVED, REJECTED, SUSPENDED",
+                  "disabled": true
+                },
+                {
+                  "key": "pharmacyId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "nearLatitude",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "nearLongitude",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "radiusMeters",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/pharmacies/branches/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/pharmacies/branches/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "pharmacies",
+                "branches",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "description": "Caller: customer",
+      "item": [
+        {
+          "name": "DELETE /v1/cart",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "cart"
+              ]
+            },
+            "description": "\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /v1/cart/items/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/cart/items/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "cart",
+                "items",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/cart",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "cart"
+              ]
+            },
+            "description": "\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /v1/cart/items/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/cart/items/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "cart",
+                "items",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `quantity` | number | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/cart/items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/cart/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "cart",
+                "items"
+              ]
+            },
+            "description": "\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `medicineId` | string | yes |\n| `quantity` | number | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"medicineId\": \"{{medicineId}}\",\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/cart/switch-branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/cart/switch-branch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "cart",
+                "switch-branch"
+              ]
+            },
+            "description": "Discards the cart and re-scopes it to the branch stocking the given\nmedicine. This is the deliberate second step after a 409\nCART_BRANCH_MISMATCH — the client prompts, the user confirms, then calls\nthis. Nothing is ever cleared without that confirmation.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `medicineId` | string | yes |\n| `quantity` | number | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"medicineId\": \"{{medicineId}}\",\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "description": "Caller: customer + branch staff",
+      "item": [
+        {
+          "name": "GET /v1/orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "customerId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "branchId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "REJECTED",
+                  "description": "one of: REJECTED, PENDING_CONFIRMATION, CONFIRMED, PREPARING, OUT_FOR_DELIVERY, DELIVERED, CANCELLED",
+                  "disabled": true
+                },
+                {
+                  "key": "paymentStatus",
+                  "value": "PENDING",
+                  "description": "one of: PENDING, PAID, FAILED, REFUNDED, PARTIALLY_REFUNDED",
+                  "disabled": true
+                },
+                {
+                  "key": "prescriptionStatus",
+                  "value": "APPROVED",
+                  "description": "one of: APPROVED, REJECTED, NOT_REQUIRED, PENDING_REVIEW",
+                  "disabled": true
+                },
+                {
+                  "key": "createdFrom",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "createdTo",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "The caller's own order history.\n\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/orders/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/orders/branch/:branchId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders/branch/:branchId?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                "branch",
+                ":branchId"
+              ],
+              "query": [
+                {
+                  "key": "customerId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "branchId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "REJECTED",
+                  "description": "one of: REJECTED, PENDING_CONFIRMATION, CONFIRMED, PREPARING, OUT_FOR_DELIVERY, DELIVERED, CANCELLED",
+                  "disabled": true
+                },
+                {
+                  "key": "paymentStatus",
+                  "value": "PENDING",
+                  "description": "one of: PENDING, PAID, FAILED, REFUNDED, PARTIALLY_REFUNDED",
+                  "disabled": true
+                },
+                {
+                  "key": "prescriptionStatus",
+                  "value": "APPROVED",
+                  "description": "one of: APPROVED, REJECTED, NOT_REQUIRED, PENDING_REVIEW",
+                  "disabled": true
+                },
+                {
+                  "key": "createdFrom",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "createdTo",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "Branch-side order queue. Requires staff membership at that branch.\n\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/orders/:id/cancel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders/:id/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                ":id",
+                "cancel"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Customer withdrawing their own order, allowed only before confirmation.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `cancelReason` | string | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cancelReason\": \"Ordered by mistake\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/orders/:id/transition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders/:id/transition",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                ":id",
+                "transition"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Staff-driven status change, validated against the allowed-transitions map.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `status` | enum: REJECTED \\| PENDING_CONFIRMATION \\| CONFIRMED \\| PREPARING \\| OUT_FOR_DELIVERY \\| DELIVERED \\| CANCELLED | yes |\n| `note` | string | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"REJECTED\",\n  \"note\": \"Transferred at 14:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/orders/checkout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                "checkout"
+              ]
+            },
+            "description": "Checkout. Tighter throttle than the rest of the API: this is the one\nendpoint that moves stock and money, and a retry storm here oversells.\n\n**Auth:** bearer token required.\n**Rate limit:** 10/min per IP (global default is 50/min).\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `branchId` | string | yes |\n| `addressId` | string | yes |\n| `paymentMethodId` | string | yes |\n| `prescriptionImageUrls` | string[] | no |\n| `couponCode` | string | no |\n| `deliveryLatitude` | number | no |\n| `deliveryLongitude` | number | no |\n| `deliveryNote` | string | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"addressId\": \"{{addressId}}\",\n  \"paymentMethodId\": \"{{paymentMethodId}}\",\n  \"prescriptionImageUrls\": [\n    \"https://cdn.example.com/rx/1.jpg\"\n  ],\n  \"couponCode\": \"SAVE10\",\n  \"deliveryLatitude\": 30.0605,\n  \"deliveryLongitude\": 31.2299,\n  \"deliveryNote\": \"Third floor, ring the bell twice\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const b = pm.response.json();",
+                  "if (b.id) pm.collectionVariables.set('orderId', b.id);",
+                  "pm.test('order created', () => pm.expect(pm.response.code).to.eql(201));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Prescriptions",
+      "description": "Caller: pharmacist",
+      "item": [
+        {
+          "name": "GET /v1/prescriptions/branch/:branchId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/prescriptions/branch/:branchId?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "prescriptions",
+                "branch",
+                ":branchId"
+              ],
+              "query": [
+                {
+                  "key": "orderId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "APPROVED",
+                  "description": "one of: APPROVED, REJECTED, NOT_REQUIRED, PENDING_REVIEW",
+                  "disabled": true
+                },
+                {
+                  "key": "reviewedById",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "Pharmacist review queue for one branch, oldest first.\n\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /v1/prescriptions/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/prescriptions/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "prescriptions",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Approve or reject. Rejection also kills the order and restores stock, so\nthis is restricted to PHARMACIST staff at the order's own branch.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `status` | enum: APPROVED \\| REJECTED | yes |\n| `notes` | string | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\",\n  \"notes\": \"Prescription legible and valid.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Delivery",
+      "description": "Caller: courier + customer",
+      "item": [
+        {
+          "name": "GET /v1/orders/:id/delivery",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders/:id/delivery",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                ":id",
+                "delivery"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Live tracking for the order's own customer.\n\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/orders/:id/delivery",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders/:id/delivery",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                ":id",
+                "delivery"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Branch staff assigns a courier to a confirmed order.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `courierStaffId` | string | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courierStaffId\": \"{{courierStaffId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/orders/:id/delivery/location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders/:id/delivery/location",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                ":id",
+                "delivery",
+                "location"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "GPS tick from the courier app. Throttled to 30/min because every call is\ncurrently a Postgres write — Phase 2.9 puts a Redis buffer in front of it.\n\n**Auth:** bearer token required.\n**Rate limit:** 30/min per IP (global default is 50/min).\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `latitude` | number | yes |\n| `longitude` | number | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 30.0605,\n  \"longitude\": 31.2299\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/orders/:id/delivery/pickup",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders/:id/delivery/pickup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                ":id",
+                "delivery",
+                "pickup"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Courier marks collection; also moves the order to OUT_FOR_DELIVERY.\n\n**Auth:** bearer token required."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "description": "Caller: customer + branch staff",
+      "item": [
+        {
+          "name": "GET /v1/payments/branch/:branchId/pending-transfers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/branch/:branchId/pending-transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "branch",
+                ":branchId",
+                "pending-transfers"
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "Queue of InstaPay references awaiting confirmation at one branch.\n\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/payments/orders/:orderId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/orders/:orderId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "orders",
+                ":orderId"
+              ],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: orderId"
+                }
+              ]
+            },
+            "description": "Payment detail for one order — its customer or the branch staff.\n\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/payments/intent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/intent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "intent"
+              ]
+            },
+            "description": "Starts a gateway payment. Rejected for cash / on-delivery / InstaPay.\n\n**Auth:** bearer token required.\n**Rate limit:** 10/min per IP (global default is 50/min).\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `orderId` | string | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/payments/orders/:orderId/instapay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/orders/:orderId/instapay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "orders",
+                ":orderId",
+                "instapay"
+              ],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: orderId"
+                }
+              ]
+            },
+            "description": "Customer reports the reference of an InstaPay transfer they already made.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `reference` | string | yes |\n| `note` | string | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reference\": \"IPN-8837261\",\n  \"note\": \"Transferred at 14:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/payments/transactions/:id/confirm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/transactions/:id/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "transactions",
+                ":id",
+                "confirm"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Branch staff confirms a reported transfer against the bank statement.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `accept` | boolean | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accept\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/payments/webhooks/:provider",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/webhooks/:provider",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "webhooks",
+                ":provider"
+              ],
+              "variable": [
+                {
+                  "key": "provider",
+                  "value": "{{provider}}",
+                  "description": "Path parameter: provider"
+                }
+              ]
+            },
+            "description": "Provider callback.\n\n`@Public()` because the gateway has no bearer token — authenticity comes\nfrom the HMAC signature instead. The payload is logged whether or not that\nsignature checks out, and the handler always answers 200: providers retry\non non-2xx, and no retry fixes a malformed body.\n\n**Auth:** public — no token needed.\n**Rate limit:** 300/min per IP (global default is 50/min).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "description": "Caller: customer",
+      "item": [
+        {
+          "name": "DELETE /v1/reviews/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/reviews/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "reviews",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "Moderation removal; also recomputes the branch rating.\n\n**Auth:** bearer token required.\n**Permission:** `reviews.moderate`"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/pharmacies/branches/:branchId/reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/pharmacies/branches/:branchId/reviews?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "pharmacies",
+                "branches",
+                ":branchId",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "branchId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "userId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "rating",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "Public branch reviews plus the rating aggregate.\n\n**Auth:** public — no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/reviews/mine",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/reviews/mine?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "reviews",
+                "mine"
+              ],
+              "query": [
+                {
+                  "key": "branchId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "userId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "rating",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/orders/:orderId/review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/orders/:orderId/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                ":orderId",
+                "review"
+              ],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: orderId"
+                }
+              ]
+            },
+            "description": "One review per delivered order, by the customer who placed it.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `rating` | number | yes |\n| `comment` | string | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Fast delivery, well packaged.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "description": "Caller: any signed-in user",
+      "item": [
+        {
+          "name": "GET /v1/notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/notifications?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "isRead",
+                  "value": "",
+                  "description": "boolean",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /v1/notifications/read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/notifications/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "notifications",
+                "read"
+              ]
+            },
+            "description": "\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `notificationIds` | string[] | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationIds\": [\n    \"{{notificationId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /v1/notifications/read-all",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/notifications/read-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "notifications",
+                "read-all"
+              ]
+            },
+            "description": "Marks every unread notification read.\n\n**Auth:** bearer token required."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "description": "Caller: branch OWNER/MANAGER/PHARMACIST",
+      "item": [
+        {
+          "name": "GET /v1/inventory/branches/:branchId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/inventory/branches/:branchId?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "inventory",
+                "branches",
+                ":branchId"
+              ],
+              "query": [
+                {
+                  "key": "medicineId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "isAvailable",
+                  "value": "",
+                  "description": "boolean",
+                  "disabled": true
+                },
+                {
+                  "key": "lowStock",
+                  "value": "",
+                  "description": "boolean",
+                  "disabled": true
+                },
+                {
+                  "key": "lowStockThreshold",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/inventory/branches/:branchId/expiring",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/inventory/branches/:branchId/expiring?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "inventory",
+                "branches",
+                ":branchId",
+                "expiring"
+              ],
+              "query": [
+                {
+                  "key": "withinDays",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "FEFO working list — batches nearest expiry first.\n\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/inventory/branches/:branchId/movements/:medicineId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/inventory/branches/:branchId/movements/:medicineId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "inventory",
+                "branches",
+                ":branchId",
+                "movements",
+                ":medicineId"
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                },
+                {
+                  "key": "medicineId",
+                  "value": "{{medicineId}}",
+                  "description": "Path parameter: medicineId"
+                }
+              ]
+            },
+            "description": "Movement ledger for one medicine at a branch.\n\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/inventory/batches",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/inventory/batches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "inventory",
+                "batches"
+              ]
+            },
+            "description": "Goods-in, at a warehouse or straight at a branch.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `medicineId` | string | yes |\n| `locationType` | enum: WAREHOUSE \\| BRANCH | yes |\n| `warehouseId` | string | no |\n| `branchId` | string | no |\n| `batchNumber` | string | yes |\n| `expiryDate` | string | yes |\n| `quantity` | number | yes |\n| `costPrice` | number | yes |\n| `sellingPrice` | number | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"medicineId\": \"{{medicineId}}\",\n  \"locationType\": \"WAREHOUSE\",\n  \"batchNumber\": \"B-2026-014\",\n  \"expiryDate\": \"2027-12-31\",\n  \"quantity\": 2,\n  \"costPrice\": 18,\n  \"warehouseId\": \"{{warehouseId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"sellingPrice\": 31.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/inventory/branches/:branchId/adjust",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/inventory/branches/:branchId/adjust",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "inventory",
+                "branches",
+                ":branchId",
+                "adjust"
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "Stock-take correction; writes an ADJUSTMENT movement carrying the delta.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `medicineId` | string | yes |\n| `countedQuantity` | number | yes |\n| `reason` | string | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"medicineId\": \"{{medicineId}}\",\n  \"countedQuantity\": 37,\n  \"reason\": \"Stock-take shrinkage\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/inventory/transfers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/inventory/transfers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "inventory",
+                "transfers"
+              ]
+            },
+            "description": "Warehouse batch to branch shelf.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `batchId` | string | yes |\n| `branchId` | string | yes |\n| `quantity` | number | yes |\n| `sellingPrice` | number | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"batchId\": \"{{batchId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"quantity\": 2,\n  \"sellingPrice\": 31.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /v1/inventory/branches/:branchId",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/inventory/branches/:branchId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "inventory",
+                "branches",
+                ":branchId"
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "Sets shelf price / availability. Quantity is not settable here.\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `medicineId` | string | yes |\n| `price` | number | yes |\n| `isAvailable` | boolean | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"medicineId\": \"{{medicineId}}\",\n  \"price\": 31.5,\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Onboarding",
+      "description": "Caller: pharmacy OWNER/MANAGER",
+      "item": [
+        {
+          "name": "GET /v1/pharmacies/branches/:branchId/staff",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/pharmacies/branches/:branchId/staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "pharmacies",
+                "branches",
+                ":branchId",
+                "staff"
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/pharmacies/:pharmacyId/branches",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/pharmacies/:pharmacyId/branches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "pharmacies",
+                ":pharmacyId",
+                "branches"
+              ],
+              "variable": [
+                {
+                  "key": "pharmacyId",
+                  "value": "{{pharmacyId}}",
+                  "description": "Path parameter: pharmacyId"
+                }
+              ]
+            },
+            "description": "An existing pharmacy opens another branch (OWNER/MANAGER).\n\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `branchName` | string | yes |\n| `licenseNumber` | string | yes |\n| `branchPhone` | string | yes |\n| `whatsappNumber` | string | no |\n| `addressText` | string | yes |\n| `latitude` | number | yes |\n| `longitude` | number | yes |\n| `deliveryRadiusMeters` | number | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchName\": \"Nasr City\",\n  \"licenseNumber\": \"LIC-2026-0001\",\n  \"branchPhone\": \"0221234567\",\n  \"addressText\": \"14 Abbas El Akkad, Nasr City, Cairo\",\n  \"latitude\": 30.0605,\n  \"longitude\": 31.2299,\n  \"whatsappNumber\": \"01001234567\",\n  \"deliveryRadiusMeters\": 8000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/pharmacies/branches/:branchId/staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/pharmacies/branches/:branchId/staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "pharmacies",
+                "branches",
+                ":branchId",
+                "staff"
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required.\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `fullName` | string | yes |\n| `phone` | string | yes |\n| `password` | string | yes |\n| `role` | enum: OWNER \\| MANAGER \\| PHARMACIST \\| STAFF \\| COURIER | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Mostafa Kamel\",\n  \"phone\": \"01001234567\",\n  \"password\": \"Passw0rd!\",\n  \"role\": \"OWNER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/pharmacies/register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/pharmacies/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "pharmacies",
+                "register"
+              ]
+            },
+            "description": "Public self-service registration — this is how a pharmacy with no account\ngets one. Throttled hard because it creates users unauthenticated.\n\n**Auth:** public — no token needed.\n**Rate limit:** 5/min per IP (global default is 50/min).\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `name` | string | yes |\n| `nameAr` | string | no |\n| `taxNumber` | string | no |\n| `branchName` | string | yes |\n| `licenseNumber` | string | yes |\n| `branchPhone` | string | yes |\n| `whatsappNumber` | string | no |\n| `addressText` | string | yes |\n| `latitude` | number | yes |\n| `longitude` | number | yes |\n| `deliveryRadiusMeters` | number | no |\n| `ownerName` | string | yes |\n| `ownerPhone` | string | yes |\n| `ownerEmail` | string | no |\n| `ownerPassword` | string | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"El Ezaby Pharmacy\",\n  \"branchName\": \"Nasr City\",\n  \"licenseNumber\": \"LIC-2026-0001\",\n  \"branchPhone\": \"0221234567\",\n  \"addressText\": \"14 Abbas El Akkad, Nasr City, Cairo\",\n  \"latitude\": 30.0605,\n  \"longitude\": 31.2299,\n  \"ownerName\": \"Mostafa Kamel\",\n  \"ownerPhone\": \"01009876543\",\n  \"ownerPassword\": \"Passw0rd!\",\n  \"nameAr\": \"صيدلية العزبي\",\n  \"taxNumber\": \"123-456-789\",\n  \"whatsappNumber\": \"01001234567\",\n  \"deliveryRadiusMeters\": 8000,\n  \"ownerEmail\": \"owner@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "AdminPharmacies",
+      "description": "Caller: platform admin",
+      "item": [
+        {
+          "name": "GET /v1/admin/pharmacies/branches/pending",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/pharmacies/branches/pending",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "pharmacies",
+                "branches",
+                "pending"
+              ]
+            },
+            "description": "\n**Auth:** bearer token required.\n**Permission:** `pharmacies.approve`"
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /v1/admin/pharmacies/branches/:branchId/review",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/pharmacies/branches/:branchId/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "pharmacies",
+                "branches",
+                ":branchId",
+                "review"
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "Approving is what lets a branch appear in search and take orders.\n\n**Auth:** bearer token required.\n**Permission:** `pharmacies.approve`\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `status` | enum: APPROVED \\| REJECTED | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /v1/admin/pharmacies/branches/:branchId/status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/pharmacies/branches/:branchId/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "pharmacies",
+                "branches",
+                ":branchId",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}",
+                  "description": "Path parameter: branchId"
+                }
+              ]
+            },
+            "description": "Suspend or reinstate a branch that was already approved.\n\n**Auth:** bearer token required.\n**Permission:** `pharmacies.suspend`\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `status` | enum: APPROVED \\| SUSPENDED | yes |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Refunds",
+      "description": "Caller: platform admin",
+      "item": [
+        {
+          "name": "GET /v1/refunds",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/refunds?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "refunds"
+              ],
+              "query": [
+                {
+                  "key": "orderId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "paymentTransactionId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "APPROVED",
+                  "description": "one of: APPROVED, REJECTED, PENDING, COMPLETED",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required.\n**Permission:** `refunds.read`"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/refunds/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/refunds/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "refunds",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required.\n**Permission:** `refunds.read`"
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /v1/refunds/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/refunds/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "refunds",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: id"
+                }
+              ]
+            },
+            "description": "PENDING -> APPROVED -> COMPLETED, or -> REJECTED.\n\n**Auth:** bearer token required.\n**Permission:** `refunds.approve`\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `status` | enum: APPROVED \\| REJECTED \\| PENDING \\| COMPLETED | yes |\n| `reason` | string | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\",\n  \"reason\": \"Stock-take shrinkage\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/refunds",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/refunds",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "refunds"
+              ]
+            },
+            "description": "\n**Auth:** bearer token required.\n**Permission:** `refunds.create`\n\n**Body fields**\n\n| Field | Type | Required |\n| --- | --- | --- |\n| `orderId` | string | yes |\n| `paymentTransactionId` | string | no |\n| `amount` | number | yes |\n| `reason` | string | no |\n| `status` | enum: APPROVED \\| REJECTED \\| PENDING \\| COMPLETED | no |",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"amount\": 45,\n  \"paymentTransactionId\": \"{{paymentTransactionId}}\",\n  \"reason\": \"Stock-take shrinkage\",\n  \"status\": \"APPROVED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Audit",
+      "description": "Caller: platform admin",
+      "item": [
+        {
+          "name": "GET /v1/admin/audit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/audit?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "actorId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "entityType",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "entityId",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "action",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "createdFrom",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "createdTo",
+                  "value": "",
+                  "description": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "1",
+                  "description": "number",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required.\n**Permission:** `audit.read`"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/admin/audit/:entityType/:entityId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/admin/audit/:entityType/:entityId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "admin",
+                "audit",
+                ":entityType",
+                ":entityId"
+              ],
+              "variable": [
+                {
+                  "key": "entityType",
+                  "value": "{{entityType}}",
+                  "description": "Path parameter: entityType"
+                },
+                {
+                  "key": "entityId",
+                  "value": "{{orderId}}",
+                  "description": "Path parameter: entityId"
+                }
+              ]
+            },
+            "description": "\n**Auth:** bearer token required.\n**Permission:** `audit.read`"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Metrics",
+      "description": "Caller: infrastructure",
+      "item": [
+        {
+          "name": "GET /metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metrics"
+              ]
+            },
+            "description": "\n**Auth:** public — no token needed.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "description": "Server root. Product routes live under /v1."
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "description": "Set automatically by login/signup/refresh."
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "description": "Set automatically by login/signup."
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "description": "Set automatically by login/signup."
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "description": "Set automatically by checkout."
+    },
+    {
+      "key": "branchId",
+      "value": "",
+      "description": "From GET /v1/pharmacies/branches."
+    },
+    {
+      "key": "medicineId",
+      "value": "",
+      "description": "From GET /v1/catalog/medicines."
+    },
+    {
+      "key": "addressId",
+      "value": "",
+      "description": "The customer address to deliver to."
+    },
+    {
+      "key": "paymentMethodId",
+      "value": "",
+      "description": "From the payment methods reference data."
+    },
+    {
+      "key": "pharmacyId",
+      "value": "",
+      "description": "Owning pharmacy of a branch."
+    },
+    {
+      "key": "courierStaffId",
+      "value": "",
+      "description": "PharmacyStaff id with role COURIER."
+    },
+    {
+      "key": "batchId",
+      "value": "",
+      "description": "Warehouse batch being transferred."
+    },
+    {
+      "key": "notificationId",
+      "value": "",
+      "description": "From GET /v1/notifications."
+    },
+    {
+      "key": "resetToken",
+      "value": "",
+      "description": "From POST /v1/auth/verify-user."
+    }
+  ]
+}

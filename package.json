@@ -27,7 +27,9 @@
     "worker:dev": "nest start --watch --entryFile worker",
     "prisma:seed": "ts-node --project prisma/tsconfig.seed.json prisma/seed.ts",
     "build:seed": "tsc --project prisma/tsconfig.seed.build.json",
-    "prisma:seed:dist": "node dist-seed/seed.js"
+    "prisma:seed:dist": "node dist-seed/seed.js",
+    "docs:spec": "curl -s http://localhost:3000/api/docs-json -o docs/openapi.json",
+    "docs:generate": "node scripts/gen-postman-collection.cjs && node scripts/gen-api-reference.cjs"
   },
   "prisma": {
     "seed": "ts-node --project prisma/tsconfig.seed.json prisma/seed.ts"
