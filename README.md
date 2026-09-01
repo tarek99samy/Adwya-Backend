@@ -59,8 +59,11 @@ src/
     <feature>.service.ts
 test/
   *.e2e-spec.ts          # e2e tests
-schema.prisma            # Prisma schema (source of truth for the data model)
-schema.prisma.original   # pre-PostGIS-removal snapshot, kept for reference
+prisma/
+  schema.prisma          # Prisma schema (source of truth for the data model)
+  schema.prisma.original # pre-PostGIS-removal snapshot, kept for reference
+  migrations/            # applied migrations; Prisma reads only this path
+  seed.ts                # reference data: permissions, profiles, payment methods
 domain-notes.md          # business rules & workflows (companion to schema.prisma)
 ```
 

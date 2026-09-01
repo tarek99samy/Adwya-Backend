@@ -9,7 +9,10 @@ WORKDIR /app
 # Copied separately from the source so a code change does not invalidate the
 # npm layer.
 COPY package*.json ./
-COPY schema.prisma ./
+# The Prisma client's postinstall generates from prisma/schema.prisma, so the
+# schema has to be in the context before `npm ci` - at its real path, not the
+# repo root, which is where it used to live.
+COPY prisma/schema.prisma ./prisma/schema.prisma
 RUN npm ci
 
 # ---------------------------------------------------------------------------
