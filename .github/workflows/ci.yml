@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push supersedes an in-flight run on the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  # Fast feedback: no services needed, so this fails within a minute on a typo.
+  static:
+    name: typecheck + unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      # The Prisma client is generated code the compiler needs; without this
+      # every `@prisma/client` import fails to resolve.
+      - run: npx prisma generate
+
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.build.json
+
+      - name: Unit tests
+        run: npx jest src --ci --runInBand
+
+      - name: Build
+        run: npm run build && npm run build:seed
+
+      # eslint.config.mjs has a pre-existing syntax error, so lint cannot run
+      # yet. Left non-blocking on purpose rather than deleted, so it starts
+      # reporting the moment that config is fixed.
+      - name: Lint (non-blocking)
+        run: npm run lint || echo "::warning::lint did not run - see eslint.config.mjs"
+        continue-on-error: true
+
+  # Exercises the real thing: migrations against a real Postgres, queue jobs
+  # through a real Redis.
+  integration:
+    name: migrations + smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: adwya_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/adwya_test?schema=public
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+      PAYMENT_WEBHOOK_SECRET: ci-webhook-secret
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma generate
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed reference data
+        run: npm run prisma:seed
+
+      - name: Build
+        run: npm run build
+
+      - name: Boot API and worker
+        run: |
+          node dist/main & echo $! > api.pid
+          node dist/worker & echo $! > worker.pid
+          # Poll readiness rather than sleeping a fixed amount.
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/readyz > /dev/null; then
+              echo "ready after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to become ready"; exit 1
+
+      - name: Readiness reports all dependencies up
+        run: |
+          BODY=$(curl -sf http://localhost:3000/readyz)
+          echo "$BODY"
+          echo "$BODY" | grep -q '"status":"ok"'
+
+      - name: Versioned routing is live
+        run: |
+          curl -sf -o /dev/null http://localhost:3000/v1/catalog/brands
+          # The unversioned path must be gone.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/catalog/brands)" = "404"
+
+      - name: Metrics endpoint exposes counters
+        run: curl -sf http://localhost:3000/metrics | grep -q adwya_http_requests_total
+
+      - name: Stop processes
+        if: always()
+        run: kill "$(cat api.pid)" "$(cat worker.pid)" 2>/dev/null || true
+
+  docker:
+    name: docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: adwya-backend:ci
+          # Reuse layers between runs; without this every build reinstalls npm.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

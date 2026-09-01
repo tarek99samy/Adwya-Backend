@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // The app is NodeNext/ESM-flavoured; ts-node runs the seed as plain
+    // CommonJS. Inline --compiler-options does not survive the Windows shell,
+    // so the override lives in a file instead.
+    "module": "CommonJS",
+    "moduleResolution": "node"
+  },
+  "include": ["seed.ts"]
+}

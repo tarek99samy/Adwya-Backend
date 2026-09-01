@@ -1,0 +1,32 @@
+# Host artefacts must never enter the build context: Windows-built
+# node_modules contain native binaries that are wrong for alpine, and a stale
+# dist/ would be copied in before `npm run build` overwrites it.
+node_modules
+dist
+coverage
+*.tsbuildinfo
+
+.git
+.github
+.gitignore
+
+# Secrets never belong in an image layer.
+.env
+.env.*
+!.env.example
+
+*.log
+.tmp-*
+scratchpad
+
+# Tests and docs are not needed at runtime.
+test
+**/*.spec.ts
+*.md
+!README.md
+
+.vscode
+.idea
+docker-compose.yml
+Dockerfile
+dist-seed

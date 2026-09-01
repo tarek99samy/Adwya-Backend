@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.seed.json",
+  "compilerOptions": {
+    // Emitted so the runtime image can seed without ts-node, which is a
+    // devDependency and gets pruned from the production tree.
+    "noEmit": false,
+    "declaration": false,
+    "sourceMap": false,
+    "incremental": false,
+    "rootDir": ".",
+    "outDir": "../dist-seed",
+    // Inherited from the root config, which is nodenext; CommonJS output
+    // cannot use it.
+    "resolvePackageJsonExports": false
+  },
+  "include": ["seed.ts"]
+}

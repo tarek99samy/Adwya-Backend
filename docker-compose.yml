@@ -1,0 +1,116 @@
+# Local development and a runnable production-shaped stack.
+#
+#   docker compose up -d postgres redis      infra only; API on the host
+#   docker compose --profile app up -d       full stack in containers
+#   docker compose --profile app up -d --scale worker=3
+#   docker compose down                      stop, keep data
+#   docker compose down -v                   stop and wipe data
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: adwya-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-0000}
+      POSTGRES_DB: ${POSTGRES_DB:-adwya_dev}
+    ports:
+      # 5433 on the host so this never fights the native Postgres install that
+      # is already bound to 5432. Point DATABASE_URL at whichever you want.
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      # Postgres 18 wants a single mount at /var/lib/postgresql (data lands in a
+      # subdirectory), not the /var/lib/postgresql/data of earlier images —
+      # mounting the old path makes the container refuse to start.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-adwya_dev}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: adwya-redis
+    restart: unless-stopped
+    # appendonly keeps BullMQ jobs across a restart; noeviction stops Redis
+    # from silently dropping job data under memory pressure. Both matter:
+    # an evicted job is work that vanishes with no error anywhere.
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy noeviction
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # --- application, behind a profile so `up -d` alone stays infra-only ------
+
+  api:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: adwya-backend:local
+    container_name: adwya-api
+    restart: unless-stopped
+    environment:
+      APP_ROLE: api
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-0000}@postgres:5432/${POSTGRES_DB:-adwya_dev}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-dev-webhook-secret-rotate-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      RUN_SEED: ${RUN_SEED:-false}
+      # Only read when RUN_SEED=true; the seed creates no admin without both.
+      SEED_ADMIN_PHONE: ${SEED_ADMIN_PHONE:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+    ports:
+      - '${API_PORT:-3000}:3000'
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'node', '-e', "require('http').get('http://127.0.0.1:3000/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: adwya-backend:local
+    restart: unless-stopped
+    # No container_name: that would block `--scale worker=N`.
+    environment:
+      APP_ROLE: worker
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-0000}@postgres:5432/${POSTGRES_DB:-adwya_dev}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Migrations are the API's job — see docker-entrypoint.sh.
+      RUN_MIGRATIONS: 'false'
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      api: { condition: service_started }
+    # Give BullMQ time to finish an in-flight job before SIGKILL.
+    stop_grace_period: 30s
+
+volumes:
+  postgres-data:
+  redis-data:
